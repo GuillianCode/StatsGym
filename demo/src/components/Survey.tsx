@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
-import {disciplines, featureKeys, surveyPayloadSchema, type SurveyPayload} from '@statsgym/contracts';
+import {accessOptionsByProfile, disciplines, featureKeys, priceScaleFor, surveyPayloadSchema, type SurveyPayload} from '@statsgym/contracts';
 import {analytics} from '../lib/analytics';
 import {submitSurvey} from '../lib/survey-api';
 
@@ -16,7 +16,6 @@ type SurveyState = {
   statsPreference: string;
   clubOffer: string;
   accessModel: AccessModel | '';
-  clubPricingModel: string;
   priceRange: string;
   idea: string;
   firstName: string;
@@ -27,7 +26,7 @@ type SurveyState = {
 
 const emptyState = (): SurveyState => ({
   submissionId: crypto.randomUUID(), profil: '', clubName: '', discipline: '', context: '', ratings: [0, 0, 0, 0, 0],
-  statsClarity: '', statsPreference: '', clubOffer: '', accessModel: '', clubPricingModel: '', priceRange: '', idea: '',
+  statsClarity: '', statsPreference: '', clubOffer: '', accessModel: '', priceRange: '', idea: '',
   firstName: '', lastName: '', email: '', waitlist: false,
 });
 
@@ -39,7 +38,6 @@ const profileFeatures: Record<Profile, [string, string][]> = {
 };
 
 const profileOptions: [Profile, string][] = [['gymnaste', 'Gymnaste'], ['parent', 'Parent'], ['entraineur', 'Entraîneur'], ['club', 'Représentant(e) de club']];
-const accessOptions: [AccessModel, string][] = [['no_pay', 'Je ne pense pas être prêt à payer pour ce type d’application.'], ['club_access', 'Je pense que mon club devrait financer cet accès.'], ['freemium', 'Je préférerais une version gratuite avec des options avancées payantes.'], ['individual', 'Je serais prêt à payer moi-même cet accès.']];
 
 function Field({label, children}: {label: string; children: React.ReactNode}) {
   return <label className="survey-field"><span>{label}</span>{children}</label>;
@@ -59,7 +57,7 @@ function Select({value, onChange, placeholder, options}: {value: string; onChang
 }
 
 export function Survey() {
-  const stepLabels = ['Profil', 'Fonctionnalités', 'Accès', 'Vos idées', 'Coordonnées'];
+  const stepLabels = ['Profil', 'Fonctionnalités', 'Attentes', 'Vos idées', 'Coordonnées'];
   const [step, setStep] = useState(0);
   const [state, setState] = useState<SurveyState>(emptyState);
   const [sending, setSending] = useState(false);
@@ -75,9 +73,10 @@ export function Survey() {
 
   const set = <K extends keyof SurveyState>(key: K, value: SurveyState[K]) => setState(previous => ({...previous, [key]: value}));
   const changeProfile = (value: string) => setState(previous => ({
-    ...previous, profil: value as Profile, context: '', ratings: [0, 0, 0, 0, 0], statsClarity: '', statsPreference: '', clubOffer: '', accessModel: '', clubPricingModel: '', priceRange: '',
+    ...previous, profil: value as Profile, context: '', ratings: [0, 0, 0, 0, 0], statsClarity: '', statsPreference: '', clubOffer: '', accessModel: '', priceRange: '',
   }));
-  const changeAccess = (value: AccessModel) => setState(previous => ({...previous, accessModel: value, clubPricingModel: '', priceRange: ''}));
+  const changeAccess = (value: AccessModel) => setState(previous => ({...previous, accessModel: value, priceRange: ''}));
+  const accessScale = state.accessModel ? priceScaleFor(state.accessModel) : undefined;
 
   const contextOptions = useMemo(() => profile === 'entraineur' ? ['1–10', '11–30', '31–60', '61–100', 'Plus de 100'] : profile === 'club' ? ['1–100', '101–250', '251–500', '501–1 000', 'Plus de 1 000'] : ['Loisir', 'Compétition fédérale', 'Compétition nationale', 'Élite / haut niveau'], [profile]);
   const pageValid = () => {
@@ -85,8 +84,7 @@ export function Survey() {
     if (step === 1) return state.ratings.every(Boolean) && (profile === 'club' ? Boolean(state.clubOffer) : Boolean(state.statsClarity && state.statsPreference));
     if (step === 2) {
       if (!state.accessModel) return false;
-      if (profile === 'club' && state.accessModel === 'club_access') return Boolean(state.clubPricingModel && state.priceRange);
-      if (profile !== 'club' && ['individual', 'freemium'].includes(state.accessModel)) return Boolean(state.priceRange);
+      return !accessScale || Boolean(state.priceRange);
     }
     if (step === 4) return Boolean(state.firstName.trim() && state.lastName.trim() && /^\S+@\S+\.\S+$/.test(state.email));
     return true;
@@ -99,9 +97,9 @@ export function Survey() {
     stats_preference: profile === 'club' ? null : state.statsPreference || null,
     club_offer: profile === 'club' ? state.clubOffer || null : null,
     access_model: state.accessModel,
-    club_pricing_model: profile === 'club' && state.accessModel === 'club_access' ? state.clubPricingModel || null : null,
-    price_range: state.priceRange || null,
-    price_period: state.priceRange ? (profile === 'club' ? 'annual' : 'monthly') : null,
+    club_pricing_model: null,
+    price_range: accessScale ? state.priceRange || null : null,
+    price_period: accessScale ? accessScale.period : null,
     idea: state.idea, first_name: state.firstName, last_name: state.lastName, email: state.email,
     waitlist_opt_in: state.waitlist,
   });
@@ -154,7 +152,7 @@ export function Survey() {
     <div className="survey-stage">
       {step === 0 && <><h2>Accédez à vos propres statistiques</h2><p>La démo présente les statistiques de trois gymnastes. Pour demander l’accès à vos propres données, il faut répondre à ce questionnaire.</p><p>Vos réponses nous permettent de construire l’accès StatsGym le plus utile pour votre profil.</p><Field label="Vous êtes…"><Select value={state.profil} onChange={changeProfile} placeholder="Choisir votre profil" options={profileOptions}/></Field><Field label="Nom du club (facultatif)"><input value={state.clubName} onChange={event => set('clubName', event.target.value)}/></Field><Field label="Discipline gymnique"><Select value={state.discipline} onChange={value => set('discipline', value)} placeholder="Choisir une discipline" options={disciplines}/></Field><Field label={profile === 'club' ? 'Combien de licenciés compte votre club ?' : profile === 'entraineur' ? 'Combien de gymnastes encadrez-vous ?' : profile === 'parent' ? 'Niveau de pratique de votre enfant' : 'Niveau de pratique'}><Select value={state.context} onChange={value => set('context', value)} placeholder="Choisir une réponse" options={contextOptions}/></Field></>}
       {step === 1 && <><h2>Évaluez les fonctionnalités de StatsGym</h2><p>Pour chaque fonctionnalité, notez son utilité de 1 (<strong>Pas du tout utile</strong>) à 5 (<strong>Indispensable</strong>).</p><div className="ratings">{profileFeatures[profile].map(([title, copy], index) => <article className="rating" key={title}><h3>{index + 1}. {title}</h3><p>{copy}</p><div className="rating-scale">{[1, 2, 3, 4, 5].map(value => <label key={value}><input type="radio" name={`rating-${index}`} checked={state.ratings[index] === value} onChange={() => setState(previous => ({...previous, ratings: previous.ratings.map((rating, ratingIndex) => ratingIndex === index ? value : rating)}))}/><span>{value}</span></label>)}</div></article>)}</div>{profile === 'club' ? <Field label="Un outil permettant à vos entraîneurs de suivre plus facilement les résultats et la progression des gymnastes est-il le type de service que votre club aimerait mettre à leur disposition ?"><Select value={state.clubOffer} onChange={value => set('clubOffer', value)} placeholder="Choisir une réponse" options={['all', 'some', 'maybe', 'no'].map((value, index) => [value, ['Oui, pour l’ensemble des entraîneurs du club', 'Oui, mais d’abord pour certains entraîneurs ou groupes', 'Peut-être, j’aimerais en savoir davantage', 'Non, ce n’est pas un outil que nous souhaiterions proposer'][index]] as const)}/></Field> : <><Field label={profile === 'entraineur' ? 'Les graphiques actuels vous donnent-ils suffisamment d’informations pour suivre la progression d’une gymnaste ?' : 'Les graphiques actuels vous paraissent-ils faciles à comprendre ?'}><Select value={state.statsClarity} onChange={value => set('statsClarity', value)} placeholder="Choisir une réponse" options={[['1', 'Pas du tout'], ['2', 'Plutôt non'], ['3', 'Moyennement'], ['4', 'Plutôt oui'], ['5', 'Tout à fait']]}/></Field><Field label={profile === 'entraineur' ? 'Pour suivre vos gymnastes, préféreriez-vous une vue plus simple et plus rapide à lire, ou des graphiques encore plus poussés pour aller plus loin dans l’analyse ?' : 'Préférez-vous une vue plus simple des statistiques, ou des graphiques encore plus poussés ?'}><Select value={state.statsPreference} onChange={value => set('statsPreference', value)} placeholder="Choisir une réponse" options={[['simple', 'Une vue plus simple'], ['balanced', 'L’équilibre actuel me convient'], ['advanced', 'Des graphiques et analyses plus poussés']]}/></Field></>}</>}
-      {step === 2 && <><h2>Comment aimeriez-vous accéder à StatsGym ?</h2><p>Quel modèle d’accès vous conviendrait le mieux ?</p><div className="choice-list">{accessOptions.map(([value, label]) => <label className="choice" key={value}><input type="radio" checked={state.accessModel === value} onChange={() => changeAccess(value)}/><span>{label}</span></label>)}</div>{profile === 'club' && state.accessModel === 'club_access' && <><Field label="Mode de financement"><Select value={state.clubPricingModel} onChange={value => setState(previous => ({...previous, clubPricingModel: value, priceRange: ''}))} placeholder="Choisir un mode" options={[['all_members', 'Forfait pour tous les licenciés'], ['per_gymnast', 'Prix par gymnaste']]}/></Field><Field label="Budget annuel"><Select value={state.priceRange} onChange={value => set('priceRange', value)} placeholder="Choisir un budget" options={['50-99', '100-199', '200-299', '300-399', '400-500']}/></Field></>}{profile !== 'club' && ['individual', 'freemium'].includes(state.accessModel) && <Field label="Budget mensuel"><Select value={state.priceRange} onChange={value => set('priceRange', value)} placeholder="Choisir un budget" options={['1-2', '3-4', '5-6', '7-8', '9-10']}/></Field>}</>}
+      {step === 2 && <><h2>Et pour la suite ?</h2><p>Quelle proposition correspond le mieux à ce que vous attendez de StatsGym ?</p><div className="choice-list">{accessOptionsByProfile[profile].map(([value, label]) => <label className="choice" key={value}><input type="radio" checked={state.accessModel === value} onChange={() => changeAccess(value)}/><span>{label}</span></label>)}</div>{accessScale && <Field label={accessScale.prompt}><Select value={state.priceRange} onChange={value => set('priceRange', value)} placeholder={accessScale.period === 'annual' ? 'Choisir un budget annuel' : 'Choisir un budget mensuel'} options={accessScale.ranges}/></Field>}</>}
       {step === 3 && <><h2>Vos idées</h2><p>Dites-nous ce qui rendrait StatsGym plus utile ou plus accessible.</p><Field label="Une idée, un besoin ou une amélioration ? (facultatif)"><textarea rows={5} value={state.idea} onChange={event => set('idea', event.target.value)}/></Field></>}
       {step === 4 && <><h2>Finaliser votre demande d’accès</h2><p>Vos coordonnées servent à analyser les retours sur StatsGym. Nous ne vous contacterons au sujet du lancement que si vous cochez la case ci-dessous.</p><Field label="Prénom"><input required value={state.firstName} onChange={event => set('firstName', event.target.value)}/></Field><Field label="Nom"><input required value={state.lastName} onChange={event => set('lastName', event.target.value)}/></Field><Field label="E-mail"><input required type="email" value={state.email} onChange={event => set('email', event.target.value)}/></Field><label className="choice"><input type="checkbox" checked={state.waitlist} onChange={event => set('waitlist', event.target.checked)}/><span>Je souhaite être informé(e) du lancement de StatsGym</span></label></>}
       {error && <p className="form-error" role="alert">{error}</p>}
