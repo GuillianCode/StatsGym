@@ -1,5 +1,5 @@
 import {createClient} from '@supabase/supabase-js';
-import {surveyPayloadSchema} from '../../../packages/contracts/src/index.ts';
+import {surveyAnalyticsProperties, surveyPayloadSchema} from '../../../packages/contracts/src/index.ts';
 
 const allowedDefault = ['https://guilliancode.github.io'];
 const encoder = new TextEncoder();
@@ -8,13 +8,50 @@ function cors(origin: string | null) {
   const configured = (Deno.env.get('ALLOWED_ORIGINS') || '').split(',').map(value => value.trim()).filter(Boolean);
   const allowed = [...allowedDefault, ...configured].includes(origin || '') || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin || '');
   return {
-    'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type',
+    'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type, x-posthog-distinct-id, x-posthog-session-id',
     'access-control-allow-methods': 'POST, OPTIONS',
     'access-control-allow-origin': allowed ? origin! : allowedDefault[0],
     'cache-control': 'no-store',
     'content-type': 'application/json',
     vary: 'origin',
   };
+}
+
+function safeTracingId(request: Request, name: string) {
+  const value = request.headers.get(name)?.trim();
+  return value && value.length <= 200 ? value : null;
+}
+
+async function captureSurveyResponse(request: Request, properties: ReturnType<typeof surveyAnalyticsProperties>) {
+  const token = Deno.env.get('POSTHOG_KEY');
+  if (!token) return;
+  const host = (Deno.env.get('POSTHOG_HOST') || 'https://eu.i.posthog.com').replace(/\/$/, '');
+  const distinctId = safeTracingId(request, 'x-posthog-distinct-id') || crypto.randomUUID();
+  const sessionId = safeTracingId(request, 'x-posthog-session-id');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1_800);
+  try {
+    const response = await fetch(`${host}/i/v0/e`, {
+      method: 'POST',
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({
+        api_key: token,
+        event: 'survey_response_submitted',
+        distinct_id: distinctId,
+        properties: {
+          ...properties,
+          $process_person_profile: false,
+          ...(sessionId ? {$session_id: sessionId} : {}),
+        },
+      }),
+      signal: controller.signal,
+    });
+    if (!response.ok) console.error('survey_posthog_capture_failed', {status: response.status});
+  } catch (error) {
+    console.error('survey_posthog_capture_failed', {reason: error instanceof DOMException && error.name === 'AbortError' ? 'timeout' : 'network'});
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function reply(status: number, body: unknown, origin: string | null) {
@@ -51,6 +88,7 @@ Deno.serve(async request => {
 
   const body = parsed.data;
   const insert = {
+    survey_schema_version: body.survey_schema_version,
     submission_id: body.submission_id,
     profile: body.profil,
     club_name: body.club_name || null,
@@ -70,7 +108,7 @@ Deno.serve(async request => {
     email: body.email,
     waitlist_opt_in: body.waitlist_opt_in,
   };
-  const result = await supabase.from('survey_responses').upsert(insert, {onConflict: 'submission_id', ignoreDuplicates: true});
+  const result = await supabase.from('survey_responses').upsert(insert, {onConflict: 'submission_id', ignoreDuplicates: true}).select('submission_id');
   if (result.error) {
     console.error('survey_response_upsert_failed', {
       code: result.error.code,
@@ -79,5 +117,6 @@ Deno.serve(async request => {
     });
     return reply(502, {error: 'Enregistrement indisponible'}, origin);
   }
+  if (result.data?.length) await captureSurveyResponse(request, surveyAnalyticsProperties(body));
   return reply(201, {ok: true}, origin);
 });

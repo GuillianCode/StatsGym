@@ -5,6 +5,7 @@ import {NetworkBackground} from './components/NetworkBackground';
 import {Home} from './components/Home';
 import {Profile, type Tab} from './components/Profile';
 import {analytics} from './lib/analytics';
+import {surveySchemaVersion} from '@statsgym/contracts';
 
 type View = 'home' | 'profile';
 
@@ -14,7 +15,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('apercu');
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get('utm_source') === 'participant_share') analytics.capture('shared_demo_opened', {share_medium: params.get('utm_medium')});
+    if (params.get('utm_source') === 'participant_share') analytics.capture('shared_demo_opened', {survey: 'new-sondage', survey_schema_version: surveySchemaVersion, campaign: params.get('utm_campaign'), share_medium: params.get('utm_medium')});
     history.replaceState({statsgym: true, view: 'home', discipline, tab: 'apercu'}, '');
     const onPop = (event: PopStateEvent) => {
       const state = event.state as {statsgym?: boolean; view?: View; discipline?: Discipline; tab?: Tab} | null;

@@ -3,6 +3,7 @@ import submitSurveySource from '../../../supabase/functions/submit-survey/index.
 import submissionIndexMigration from '../../../supabase/migrations/202608240002_fix_survey_submission_unique.sql?raw';
 import submissionPermissionMigration from '../../../supabase/migrations/202608240003_grant_survey_upsert_select.sql?raw';
 import rateLimitMigration from '../../../supabase/migrations/202608240004_raise_survey_rate_limit.sql?raw';
+import schemaVersionMigration from '../../../supabase/migrations/202608240005_survey_schema_version.sql?raw';
 
 describe('survey storage contract', () => {
   it('backs the submission upsert with a non-partial unique index', () => {
@@ -19,6 +20,23 @@ describe('survey storage contract', () => {
   it('logs storage failures without logging the submitted payload', () => {
     expect(submitSurveySource).toContain("console.error('survey_response_upsert_failed'");
     expect(submitSurveySource).not.toContain('details: result.error.details');
+  });
+
+  it('versionne les réponses et reconnaît les réponses v2 historiques', () => {
+    expect(schemaVersionMigration).toMatch(/add column if not exists survey_schema_version smallint not null default 1/i);
+    expect(schemaVersionMigration).toContain("'current_ok'");
+    expect(schemaVersionMigration).toContain("'coach_tools'");
+    expect(schemaVersionMigration).toMatch(/set survey_schema_version = 2/i);
+  });
+
+  it('capture une seule fois côté serveur, sans faire échouer le stockage', () => {
+    expect(submitSurveySource).toContain(".select('submission_id')");
+    expect(submitSurveySource).toContain('if (result.data?.length) await captureSurveyResponse');
+    expect(submitSurveySource.indexOf("if (result.error)")).toBeLessThan(submitSurveySource.indexOf('if (result.data?.length)'));
+    expect(submitSurveySource).toContain("$process_person_profile: false");
+    expect(submitSurveySource).toContain("'x-posthog-distinct-id'");
+    expect(submitSurveySource).toContain("'x-posthog-session-id'");
+    expect(submitSurveySource).toContain("return reply(201, {ok: true}, origin)");
   });
 
   it('allows shared networks up to 100 survey attempts per hour', () => {

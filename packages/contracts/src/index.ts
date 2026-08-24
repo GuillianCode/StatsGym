@@ -10,6 +10,36 @@ export const featureKeys = [
   'historique_competitions', 'reperes_par_agres', 'palmares',
   'progression_temps', 'comparaison_gymnastes',
 ] as const;
+export const surveySchemaVersion = 2 as const;
+
+export const profileLabels = {
+  gymnaste: 'Gymnaste',
+  parent: 'Parent',
+  entraineur: 'Entraîneur',
+  club: 'Club',
+} as const;
+
+export const featureRatingLabels: Record<number, string> = {
+  1: '1 — Pas du tout utile',
+  2: '2',
+  3: '3',
+  4: '4',
+  5: '5 — Indispensable',
+} as const;
+
+export const statsClarityLabels = {
+  '1': '1 — Pas du tout',
+  '2': '2',
+  '3': '3',
+  '4': '4',
+  '5': '5 — Tout à fait',
+} as const;
+
+export const statsPreferenceLabels = {
+  simple: 'Une vue plus simple',
+  balanced: 'L’équilibre actuel me convient',
+  advanced: 'Des graphiques et analyses plus poussés',
+} as const;
 
 export const accessModels = [
   'current_ok', 'international', 'training', 'video',
@@ -106,6 +136,7 @@ const nullableShort = (max: number) => z.string().trim().max(max).nullable();
 const ratingSchema = z.object(Object.fromEntries(featureKeys.map(key => [key, z.number().int().min(1).max(5)])) as Record<(typeof featureKeys)[number], z.ZodNumber>);
 
 export const surveyPayloadSchema = z.object({
+  survey_schema_version: z.literal(surveySchemaVersion),
   submission_id: z.uuid(),
   profil: z.enum(profiles),
   club_name: z.string().trim().max(180),
@@ -153,3 +184,38 @@ export const surveyPayloadSchema = z.object({
 });
 
 export type SurveyPayload = z.infer<typeof surveyPayloadSchema>;
+
+export function surveyAnalyticsProperties(value: SurveyPayload) {
+  const accessLabel = accessOptionsByProfile[value.profil].find(([key]) => key === value.access_model)?.[1] ?? value.access_model;
+  const scale = priceScaleFor(value.access_model);
+  const priceLabel = scale?.ranges.find(([key]) => key === value.price_range)?.[1] ?? null;
+  const contextType = value.profil === 'club' ? 'club_members' : value.profil === 'entraineur' ? 'gymnasts_coached' : 'practice_level';
+  const ratings = Object.fromEntries(featureKeys.flatMap(key => [
+    [`feature_${key}`, value.feature_ratings[key]],
+    [`feature_${key}_label`, featureRatingLabels[value.feature_ratings[key]]],
+  ]));
+
+  return {
+    survey: 'new-sondage',
+    survey_schema_version: surveySchemaVersion,
+    source: 'supabase_edge',
+    profile: value.profil,
+    profile_label: profileLabels[value.profil],
+    club_name: value.club_name || null,
+    discipline: value.discipline,
+    context: value.context,
+    context_type: contextType,
+    context_label: value.context,
+    ...ratings,
+    stats_clarity: value.stats_clarity,
+    stats_clarity_label: value.stats_clarity ? statsClarityLabels[value.stats_clarity as keyof typeof statsClarityLabels] : null,
+    stats_preference: value.stats_preference,
+    stats_preference_label: value.stats_preference ? statsPreferenceLabels[value.stats_preference as keyof typeof statsPreferenceLabels] : null,
+    access_model: value.access_model,
+    access_model_label: accessLabel,
+    price_range: value.price_range,
+    price_range_label: priceLabel,
+    price_period: value.price_period,
+    price_period_label: value.price_period === 'monthly' ? 'Mensuel' : value.price_period === 'annual' ? 'Annuel' : null,
+  };
+}
