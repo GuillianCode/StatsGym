@@ -29,7 +29,7 @@ export const accessOptionsByProfile: Record<Profile, readonly (readonly [AccessM
     ['video', 'Je veux pouvoir associer la vidéo de mes mouvements à mes notes.'],
   ],
   parent: [
-    ['current_ok', 'Cette version pour suivre ses résultats me convient très bien.'],
+    ['current_ok', 'Cette version pour suivre les résultats de mon enfant me convient très bien.'],
     ['international', 'Je veux pouvoir suivre aussi les gymnastes internationaux avec lui / elle.'],
     ['training', 'Je préfère un outil pour suivre ses progrès aux entraînements.'],
     ['video', 'Je veux pouvoir associer la vidéo de ses mouvements à ses notes.'],
@@ -47,6 +47,33 @@ export const accessOptionsByProfile: Record<Profile, readonly (readonly [AccessM
     ['no_use', 'Nous n’avons pas l’utilité d’un tel outil.'],
   ],
 };
+
+// Entraîneurs et clubs répondent à une question d'accès ; gymnastes et parents,
+// à une question de direction produit.
+export const accessTitles: Record<Profile, string> = {
+  gymnaste: 'Et pour la suite ?',
+  parent: 'Et pour la suite ?',
+  entraineur: 'Comment aimeriez-vous accéder à StatsGym ?',
+  club: 'Comment aimeriez-vous accéder à StatsGym ?',
+};
+
+// Questions de fin d'étape 2. Les clubs n'en ont plus.
+export const statsQuestionLabels: Record<Exclude<Profile, 'club'>, {clarity: string; preference: string}> = {
+  gymnaste: {
+    clarity: 'Les graphiques actuels vous paraissent-ils faciles à comprendre ?',
+    preference: 'Préférez-vous une vue plus simple des statistiques, ou des graphiques encore plus poussés ?',
+  },
+  parent: {
+    clarity: 'Les graphiques actuels vous paraissent-ils faciles à comprendre ?',
+    preference: 'Préférez-vous une vue plus simple des statistiques, ou des graphiques encore plus poussés ?',
+  },
+  entraineur: {
+    clarity: 'Les graphiques actuels suffisent-ils à suivre la progression d’une gymnaste ?',
+    preference: 'Pour suivre vos gymnastes, une vue plus simple ou des graphiques plus poussés ?',
+  },
+};
+
+export const ideaLabel = 'Une idée, une question, ou une amélioration à nous partager ?';
 
 // Seules ces réponses ouvrent la question du budget, chacune avec sa propre échelle.
 export const priceScales = {
@@ -100,8 +127,11 @@ export const surveyPayloadSchema = z.object({
   'bot-field': z.string().optional(),
 }).superRefine((value, context) => {
   const isClub = value.profil === 'club';
-  if (isClub && !['all', 'some', 'maybe', 'no'].includes(value.club_offer ?? '')) {
-    context.addIssue({code: 'custom', path: ['club_offer'], message: 'Réponse club invalide'});
+  if (value.club_offer) {
+    context.addIssue({code: 'custom', path: ['club_offer'], message: 'Réponse club non attendue'});
+  }
+  if (isClub && (value.stats_clarity || value.stats_preference)) {
+    context.addIssue({code: 'custom', path: ['stats_clarity'], message: 'Réponses statistiques non attendues'});
   }
   if (!isClub && (!/^[1-5]$/.test(value.stats_clarity ?? '') || !['simple', 'balanced', 'advanced'].includes(value.stats_preference ?? ''))) {
     context.addIssue({code: 'custom', path: ['stats_clarity'], message: 'Réponses statistiques invalides'});

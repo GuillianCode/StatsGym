@@ -1,7 +1,7 @@
 // `?raw` évite toute dépendance à Node : Vite fournit le fichier tel quel.
 import html from '../../../published-demo/index.html?raw';
 import {describe, expect, it} from 'vitest';
-import {accessOptionsByProfile, priceScales} from '@statsgym/contracts';
+import {accessOptionsByProfile, accessTitles, ideaLabel, priceScales, statsQuestionLabels} from '@statsgym/contracts';
 
 // Le questionnaire existe en double : la page publiée (JavaScript autonome) et
 // le chantier React (qui lit le contrat). Ce test échoue dès que les deux
@@ -12,8 +12,11 @@ const donneesPubliees = () => {
   const fin = html.indexOf('const models=()=>', debut);
   expect(debut, 'bloc accessOptions introuvable dans la page publiée').toBeGreaterThan(-1);
   expect(fin, 'bloc priceScales introuvable dans la page publiée').toBeGreaterThan(debut);
-  return new Function(`${html.slice(debut, fin)} return {accessOptions, priceScales};`)() as {
+  return new Function(`${html.slice(debut, fin)} return {accessOptions, accessTitles, statsLabels, ideaLabel, priceScales};`)() as {
     accessOptions: Record<string, [string, string][]>;
+    accessTitles: Record<string, string>;
+    statsLabels: Record<string, {clarity: string; preference: string}>;
+    ideaLabel: string;
     priceScales: Record<string, {period: string; prompt: string; ranges: [string, string][]}>;
   };
 };
@@ -35,5 +38,14 @@ describe('Parité entre la page publiée et le contrat', () => {
       expect(publiees[model].prompt, `${model}: question`).toBe(scale.prompt);
       expect(publiees[model].ranges.map(([key]) => key), `${model}: budgets`).toEqual(scale.ranges.map(([key]) => key));
     }
+  });
+
+  it('affiche les mêmes titres et les mêmes questions', () => {
+    const publiees = donneesPubliees();
+    expect(publiees.accessTitles).toEqual(accessTitles);
+    expect(publiees.statsLabels).toEqual(statsQuestionLabels);
+    expect(publiees.ideaLabel).toBe(ideaLabel);
+    // Un club ne répond plus à la question de fin d'étape 2.
+    expect(publiees.statsLabels.club).toBeUndefined();
   });
 });

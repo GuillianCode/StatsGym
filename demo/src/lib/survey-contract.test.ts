@@ -10,7 +10,7 @@ const base = (profil: Profile, extra: Record<string, unknown> = {}) => ({
   feature_ratings: {historique_competitions: 4, reperes_par_agres: 4, palmares: 3, progression_temps: 5, comparaison_gymnastes: 2},
   stats_clarity: profil === 'club' ? null : '4',
   stats_preference: profil === 'club' ? null : 'balanced',
-  club_offer: profil === 'club' ? 'some' : null,
+  club_offer: null,
   club_pricing_model: null,
   price_range: null,
   price_period: null,
@@ -52,6 +52,14 @@ describe('Contrat du questionnaire — étape Attentes', () => {
   it('impose la bonne périodicité : mensuelle pour un coach, annuelle pour un club', () => {
     expect(surveyPayloadSchema.safeParse(base('club', {access_model: 'club_analytics', price_range: '100-150', price_period: 'monthly'})).success).toBe(false);
     expect(surveyPayloadSchema.safeParse(base('club', {access_model: 'club_analytics', price_range: '100-150', price_period: 'annual'})).success).toBe(true);
+  });
+
+  it('refuse les réponses d’étape 2 restées d’un profil précédent', () => {
+    // Un club ne répond plus aux questions statistiques : les garder signalerait
+    // un état non nettoyé après un changement de profil.
+    expect(surveyPayloadSchema.safeParse(base('club', {access_model: 'no_use', stats_clarity: '4'})).success).toBe(false);
+    expect(surveyPayloadSchema.safeParse(base('club', {access_model: 'no_use', stats_preference: 'balanced'})).success).toBe(false);
+    expect(surveyPayloadSchema.safeParse(base('club', {access_model: 'no_use', club_offer: 'some'})).success).toBe(false);
   });
 
   it('refuse un budget accroché à une réponse qui n’en demande pas', () => {
