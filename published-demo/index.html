@@ -1143,7 +1143,10 @@ body.sur-recherche{ overflow:hidden !important; overscroll-behavior:none; }
    Posé dans l'en-tête de fiche, à gauche de l'avatar : c'est le seul endroit
    qui remonte avec le défilement au lieu de flotter par-dessus. */
 .retour{
-  flex:0 0 auto; width:26px; height:34px; margin:-2px -2px -2px -4px;
+  /* La flèche reste visuellement compacte, mais sa cible tactile atteint les
+     44 px recommandés sur mobile. Les marges négatives conservent exactement
+     la place qu'elle occupait dans la grille. */
+  flex:0 0 auto; width:44px; height:44px; margin:-7px -11px -7px -7px;
   font:inherit; font-size:24px; line-height:1; color:rgba(255,255,255,.55);
   background:none; border:none; cursor:pointer; padding:0;
   -webkit-tap-highlight-color:transparent;
@@ -1469,52 +1472,10 @@ body.sur-recherche{ overflow:hidden !important; overscroll-behavior:none; }
    défiler le document, comme partout ailleurs sur la page. */
 #profileHeader{ touch-action:auto !important; }
 
-/* ---------- Les deux bords de l'écran ----------
-   `viewport-fit=cover` fait déjà courir la page jusqu'aux bords : le contenu
-   passe derrière l'encoche en haut et derrière la barre de Safari en bas. Sans
-   traitement, une ligne de tableau se coupait net sur l'encoche — on lisait
-   une moitié de chiffre.
-
-   Deux voiles fixes règlent ça. Ils ne repoussent RIEN : la bulle du nom garde
-   sa marge sous l'encoche, le dock garde la sienne au-dessus de la barre
-   d'accueil. Ils se contentent d'estomper ce qui passe dessous.
-
-   Le dégradé est double, et c'est ce qui fait l'effet iOS :
-     - `backdrop-filter` floute ce qu'il y a derrière ;
-     - `mask-image` fait DISPARAÎTRE ce floutage en descendant, si bien que le
-       flou lui-même s'estompe au lieu de s'arrêter sur une ligne nette.
-   Un seul dégradé de couleur aurait posé un rectangle sombre ; c'est le flou
-   qui s'évanouit qui donne l'impression que la page continue.
-
-   Sur un téléphone sans encoche, `env(safe-area-inset-*)` vaut 0 : les voiles
-   se réduisent à leur retombée, et l'effet reste juste. Là où
-   `backdrop-filter` n'existe pas — quelques Android — il ne reste que le
-   dégradé de couleur, ce qui suffit à ne pas couper le texte net. */
-#screen-profile::before,
-#screen-profile::after{
-  position:fixed; left:0; right:0; z-index:3; content:''; pointer-events:none;
-}
-#screen-profile::before{
-  top:0; height:calc(env(safe-area-inset-top, 0px) + 22px);
-  background:linear-gradient(to bottom, rgba(0,8,20,.80), rgba(0,8,20,0));
-  -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
-  -webkit-mask-image:linear-gradient(to bottom, #000 45%, transparent 100%);
-          mask-image:linear-gradient(to bottom, #000 45%, transparent 100%);
-}
-/* En bas, le voile monte plus haut : il doit couvrir la retombée sous la barre
-   d'accueil ET la hauteur du dock, pour que celui-ci repose sur quelque chose
-   plutôt que de flotter sur un tableau. */
-#screen-profile::after{
-  bottom:0; height:calc(env(safe-area-inset-bottom, 0px) + 74px);
-  background:linear-gradient(to top, rgba(0,8,20,.85), rgba(0,8,20,0));
-  -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
-  -webkit-mask-image:linear-gradient(to top, #000 45%, transparent 100%);
-          mask-image:linear-gradient(to top, #000 45%, transparent 100%);
-}
-/* L'accueil tient d'un seul tenant et ne fait rien passer sous les bords : un
-   voile n'y aurait rien à estomper, et assombrirait le décor pour rien. */
-body.sur-recherche #screen-profile::before,
-body.sur-recherche #screen-profile::after{ display:none; }
+/* Les safe areas sont déjà prises en charge par la marge de l'en-tête, la
+   position du dock et le padding bas des onglets. Aucun voile fixe n'est
+   nécessaire : il formait deux barres sombres et forçait Safari à repeindre un
+   backdrop-filter pendant le défilement. */
 /* ---------- Les écrans courts ----------
    La page doit tenir d'un seul tenant, sans défilement : c'est la première
    chose qu'on voit en arrivant d'une story, et un pouce qui doit faire défiler
@@ -5150,9 +5111,9 @@ renderCompareNFBloc = function(){};
   if (el) el.style.display = 'none';
 });
 /* ---------- Onglets en carrousel ----------
-   Les cinq onglets sont côte à côte sur une piste horizontale. On y va au
-   doigt ou par le dock ; la pastille du dock suit le défilement en continu,
-   pas seulement à l'arrivée. */
+   Les cinq onglets sont côte à côte sur une piste horizontale. Le dock les
+   sélectionne immédiatement ; le glissement au doigt reste volontairement
+   désactivé pour ne pas entrer en conflit avec les tableaux et graphiques. */
 var ONGLETS = ['apercu','competitions','statistiques','compare','classement'];
 (function(){
   var ecran = document.getElementById('screen-profile');
@@ -5261,6 +5222,15 @@ var ONGLETS = ['apercu','competitions','statistiques','compare','classement'];
     pilule.style.width = largeur + 'px';
   }
 
+  function afficherPosition(i){
+    piste.scrollLeft = i * piste.clientWidth;
+    placerPilule(i);
+    dock.querySelectorAll('.dock-btn').forEach(function(b, k){
+      b.classList.toggle('active', k === i);
+    });
+    suivreEntete();
+  }
+
   piste.addEventListener('scroll', function(){
     var pos = piste.scrollLeft / Math.max(1, piste.clientWidth);
     placerPilule(pos);
@@ -5275,12 +5245,11 @@ var ONGLETS = ['apercu','competitions','statistiques','compare','classement'];
   setTab = function(nom){
     var i = ONGLETS.indexOf(nom);
     if (i < 0) return;
-    // Par le dock, le défilement est instantané côté navigateur : on adoucit
-    // l'en-tête le temps de la transition.
-    entete.style.transition = 'transform .3s ease';
-    clearTimeout(entete._t);
-    entete._t = setTimeout(function(){ entete.style.transition = ''; }, 340);
-    piste.scrollTo({ left: i * piste.clientWidth, behavior: 'smooth' });
+    // Le dock est utilisé sans cesse : sa réponse doit être immédiate. Le
+    // glissement fluide de 500 à 900 ms donnait l'impression que l'application
+    // chargeait alors que les données étaient déjà prêtes.
+    entete.style.transition = '';
+    afficherPosition(i);
     if (piste.clientWidth === 0) placerPilule(i);   // avant la mise en page
   };
 
@@ -5375,12 +5344,15 @@ setTab = function(onglet){
   synchroniserPaletteSondage(onglet);
   return setTabBrutPalette(onglet);
 };
+var navigationProfil = 0;
 function afficherAccueil(){
+  navigationProfil += 1;
   if (window.StatsGymFinishActiveTab) window.StatsGymFinishActiveTab('returned_to_search');
   goToSearchBrut();
   document.body.classList.add('sur-recherche');
   synchroniserPaletteSondage(null);
   listerTout(searchInput, searchResults, null);
+  if (typeof attenteAccueil === 'function') attenteAccueil(null, null, false);
   var ecran = document.getElementById('screen-search');
   if (ecran) ecran.scrollTop = 0;
   requestAnimationFrame(function(){
@@ -5390,7 +5362,9 @@ function afficherAccueil(){
 }
 var openProfileBrut = openProfile;
 openProfile = function(id){
-  document.body.classList.remove('sur-recherche');
+  // La fiche reste masquée pendant son rendu. La révéler ici créait une
+  // fenêtre où le bouton retour existait déjà mais où history.state indiquait
+  // encore l'accueil ; la fin du chargement pouvait alors annuler le retour.
   return openProfileBrut(id);
 };
 
@@ -5542,27 +5516,33 @@ function attenteAccueil(source, destination, active){
 async function ouvrirDepuisAccueil(disc, id, onglet, source, historique){
   var destination = onglet || 'apercu';
   var mode = historique || 'push';
+  var navigation = ++navigationProfil;
   var lignesAvant = currentRows;
   erreurAccueil('');
   attenteAccueil(source, destination, true);
   try{
     selectionnerDisciplineAccueil(disc);
     await openProfile(id);
+    if (navigation !== navigationProfil) return false;
     var chargee = currentAthleteKey === id && currentRows && currentRows.length
       && currentRows !== lignesAvant;
     if (!chargee) throw new Error('La fiche demandée n’a pas pu être chargée.');
-    await new Promise(function(resolve){ requestAnimationFrame(resolve); });
-    setTab(destination);
     var etat = { statsgym:true, view:'profile', discipline:disc, athleteId:id, tab:destination };
     if (mode === 'push') history.pushState(etat, '');
     if (mode === 'replace') history.replaceState(etat, '');
+    // L'historique est prêt avant que la fiche apparaisse. La classe et
+    // l'onglet sont ensuite posés dans la même tâche, donc aucun état
+    // intermédiaire n'est peint.
+    document.body.classList.remove('sur-recherche');
+    setTab(destination);
     return true;
   }catch(e){
+    if (navigation !== navigationProfil) return false;
     afficherAccueil();
     erreurAccueil('Impossible d’ouvrir cette fiche. Réessaie.');
     throw e;
   }finally{
-    attenteAccueil(source, destination, false);
+    if (navigation === navigationProfil) attenteAccueil(source, destination, false);
   }
 }
 
@@ -5782,23 +5762,12 @@ window.reglerComparaisonAvantRendu = function(){
       Math.round(piste.scrollLeft / Math.max(1, piste.clientWidth))));
   }
 
-  /* Pendant le glissement, DEUX onglets sont à l'écran. On prend la plus
-     grande des deux hauteurs : prendre celle d'arrivée trop tôt aurait coupé
-     le sortant, et l'inverse aurait fait sauter la page à mi-chemin. */
-  /* `vise` : l'onglet vers lequel on part. Il faut le compter AVANT que le
-     glissement ne commence — sinon la piste garde un instant la hauteur du
-     départ, et la position de lecture qu'on restaure est écrêtée à ce
-     qu'elle permet. Mesuré : on revenait à 617 au lieu de 2000. */
+  /* `vise` : l'onglet vers lequel on part. La piste ne glisse plus pendant
+     plusieurs centaines de millisecondes, elle prend donc directement la
+     hauteur du panneau cible. */
   function caler(vise){
-    var large = Math.max(1, piste.clientWidth);
-    var pos = piste.scrollLeft / large;
-    var i = Math.max(0, Math.min(piste.children.length - 1, Math.floor(pos)));
-    var j = Math.min(piste.children.length - 1, i + 1);
+    var i = vise != null ? vise : indexCourant();
     var h = piste.children[i] ? piste.children[i].offsetHeight : 0;
-    if (pos > i + 0.001 && piste.children[j])
-      h = Math.max(h, piste.children[j].offsetHeight);
-    if (vise != null && piste.children[vise])
-      h = Math.max(h, piste.children[vise].offsetHeight);
     if (h) piste.style.height = h + 'px';
   }
 
@@ -5809,10 +5778,17 @@ window.reglerComparaisonAvantRendu = function(){
      Un ResizeObserver passe un tableau, un événement passe un Event — et
      `piste.children[<un Event>]` vaut `undefined`, ce qui aurait été sans
      effet ici, mais pour de mauvaises raisons. On enveloppe. */
-  var recaler = function(){ caler(); };
+  var recalageProgramme = false;
+  var recaler = function(){
+    if (recalageProgramme) return;
+    recalageProgramme = true;
+    requestAnimationFrame(function(){
+      recalageProgramme = false;
+      caler();
+    });
+  };
   var guet = new ResizeObserver(recaler);
   Array.prototype.forEach.call(piste.children, function(t){ guet.observe(t); });
-  piste.addEventListener('scroll', recaler, { passive: true });
   window.addEventListener('resize', recaler);
 
   /* Changer d'onglet : on range la position de celui qu'on quitte, on ressort
@@ -5822,11 +5798,10 @@ window.reglerComparaisonAvantRendu = function(){
   setTab = function(nom){
     var partant = ONGLETS[indexCourant()];
     if (partant) memoire[partant] = window.scrollY;
+    var vise = ONGLETS.indexOf(nom);
     var sortie = setTabAvantHauteur(nom);
-    requestAnimationFrame(function(){
-      caler(ONGLETS.indexOf(nom));
-      window.scrollTo(0, memoire[nom] || 0);
-    });
+    caler(vise);
+    window.scrollTo(0, memoire[nom] || 0);
     return sortie;
   };
 
@@ -5838,13 +5813,19 @@ window.reglerComparaisonAvantRendu = function(){
   };
 
   /* Toucher l'onglet déjà ouvert ramène en haut — le geste d'iOS. */
+  dock.addEventListener('click', function(e){
+    var bouton = e.target.closest('.dock-btn');
+    if (!bouton) return;
+    bouton._etaitActifAvantClic = indexCourant() === ONGLETS.indexOf(bouton.dataset.tab);
+  }, true);
   dock.querySelectorAll('.dock-btn').forEach(function(bouton, k){
     bouton.addEventListener('click', function(){
-      if (indexCourant() !== k) return;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (!bouton._etaitActifAvantClic) return;
+      var reduire = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: 0, behavior: reduire ? 'auto' : 'smooth' });
       // Le filet : `behavior:'smooth'` est ignoré sans un mot par certains
       // navigateurs, et le bouton ne ferait alors rien du tout.
-      setTimeout(function(){ if (window.scrollY > 2) window.scrollTo(0, 0); }, 400);
+      if (!reduire) setTimeout(function(){ if (window.scrollY > 2) window.scrollTo(0, 0); }, 400);
     });
   });
 
@@ -5982,18 +5963,15 @@ if (boutonAcces){
 
 var dockHistorique = document.getElementById('dock');
 if (dockHistorique){
-  var memoriserOnglet = function(){
+  var setTabAvantHistorique = setTab;
+  setTab = function(onglet){
+    var sortie = setTabAvantHistorique(onglet);
     var etat = history.state;
-    var actif = dockHistorique.querySelector('.dock-btn.active');
-    var onglet = actif && actif.dataset.tab;
     if (etat && etat.statsgym && etat.view === 'profile' && onglet && etat.tab !== onglet){
       history.replaceState(Object.assign({}, etat, {tab:onglet}), '');
     }
+    return sortie;
   };
-  var observateurOnglet = new MutationObserver(memoriserOnglet);
-  dockHistorique.querySelectorAll('.dock-btn').forEach(function(bouton){
-    observateurOnglet.observe(bouton, {attributes:true, attributeFilter:['class']});
-  });
 }
 
 window.addEventListener('popstate', function(e){

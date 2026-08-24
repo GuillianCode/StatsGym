@@ -8,3 +8,8 @@ Les seules adaptations locales concernent l’hébergement GitHub Pages : chemin
 des médias, configuration publique PostHog et envoi du questionnaire vers
 l’Edge Function Supabase. `runtime-config.js` est remplacé au déploiement et ne
 doit contenir aucune clé secrète.
+
+Cette mention conserve uniquement la provenance historique de la démo. La
+version publiée est désormais maintenue exclusivement dans
+`GuillianCode/StatsGym` ; aucun dépôt source externe n'entre dans son cycle de
+développement ou de déploiement.
