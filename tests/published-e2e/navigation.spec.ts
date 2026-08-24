@@ -26,6 +26,46 @@ test('change les onglets immédiatement et synchronise l’historique', async ({
   }
 });
 
+test('dessine réellement le profil par agrès après la révélation', async ({page}) => {
+  await ouvrirFiche(page);
+  await expect.poll(() => page.evaluate(() => {
+    const chart = (window as typeof window & {Chart: any}).Chart.getChart('radarChart');
+    return chart.getDatasetMeta(0).data.every((point: {x: number; y: number}) =>
+      Number.isFinite(point.x) && Number.isFinite(point.y));
+  }), {timeout: 500}).toBe(true);
+
+  const radar = await page.evaluate(() => {
+    const canvas = document.querySelector<HTMLCanvasElement>('#radarChart')!;
+    const chart = (window as typeof window & {Chart: any}).Chart.getChart(canvas);
+    const pixels = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+    let peints = 0;
+    let bleus = 0;
+    for (let i = 3; i < pixels.length; i += 4) {
+      if (pixels[i] !== 0) peints += 1;
+      if (pixels[i] !== 0 && pixels[i - 1] > pixels[i - 3] + 20) bleus += 1;
+    }
+    const padding = chart.options.layout.padding;
+    return {
+      largeur: chart.chartArea.width,
+      valeurs: chart.data.datasets[0].data.length,
+      centreFini: Number.isFinite(chart.scales.r.xCenter),
+      paddingFini: Number.isFinite(padding.left) && Number.isFinite(padding.right),
+      pointsFinis: chart.getDatasetMeta(0).data.every((point: {x: number; y: number}) =>
+        Number.isFinite(point.x) && Number.isFinite(point.y)),
+      pixelsPeints: peints,
+      pixelsBleus: bleus,
+    };
+  });
+
+  expect(radar.largeur).toBeGreaterThan(0);
+  expect(radar.valeurs).toBe(6);
+  expect(radar.centreFini).toBe(true);
+  expect(radar.paddingFini).toBe(true);
+  expect(radar.pointsFinis).toBe(true);
+  expect(radar.pixelsPeints).toBeGreaterThan(0);
+  expect(radar.pixelsBleus).toBeGreaterThan(0);
+});
+
 test('revient à l’accueil en une action et restaure la fiche avec suivant', async ({page}) => {
   await ouvrirFiche(page);
   const longueur = await page.evaluate(() => history.length);
@@ -65,7 +105,7 @@ test('ne révèle pas la fiche avant que son historique soit prêt', async ({pag
   await page.evaluate(() => {
     const ouvrir = window.openProfile;
     window.openProfile = async (id: number) => {
-      await new Promise(resolve => setTimeout(resolve, 250));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       return ouvrir(id);
     };
   });

@@ -3783,7 +3783,20 @@ renderKPIs = function(rows){
    côté opposé, et l'ajustement suivant retombe au milieu. Trois passes au
    plus — en pratique une suffit —, et on s'arrête à deux pixels près : chercher
    l'exactitude au pixel ferait osciller la figure sans que personne le voie. */
+function radarMesurable(chart){
+  var r = chart && chart.scales && chart.scales.r;
+  return !!(chart && chart.canvas && chart.width > 0 && r &&
+    Number.isFinite(chart.width) && Number.isFinite(r.xCenter));
+}
+
 function centrerRadar(chart){
+  /* Une fiche se prépare maintenant hors écran pour que son historique soit
+     prêt avant son affichage. Chart.js donne alors au radar une largeur nulle
+     et un centre infini. Ne jamais injecter cette mesure dans le padding : une
+     fois `Infinity` écrit, même un resize visible ne peut plus récupérer le
+     graphique. L'appelant le reprendra une seule fois après la révélation,
+     sans boucle si la navigation a été annulée. */
+  if (!radarMesurable(chart)) return;
   /* La cible est le milieu du CANEVAS, jamais celui de la boîte de l'échelle :
      celle-ci recule à mesure qu'on l'écarte, et viser son milieu revient à
      courir après une cible qui fuit — la marge gonflait de deux en deux
@@ -3793,6 +3806,7 @@ function centrerRadar(chart){
     var r = chart.scales.r;
     if (!r) break;
     var ecart = Math.round(r.xCenter - chart.width / 2);
+    if (!Number.isFinite(ecart)) break;
     if (Math.abs(ecart) < 2) break;
     var marges = chart.options.layout.padding;
     if (ecart < 0) marges.left = (marges.left || 0) - ecart;
@@ -3810,6 +3824,21 @@ function centrerRadar(chart){
      elle n'a lieu que si le rembourrage a effectivement bougé. */
   if (retouche) chart.update();
 }
+
+/* Les radars préparés pendant que la fiche est cachée sont repris une seule
+   fois après sa révélation. Le `update('none')` est volontaire : leurs points
+   partent de coordonnées NaN, qu'une animation ne peut pas interpoler. */
+window.recentrerRadarsVisibles = function(){
+  if (!(window.Chart && Chart.getChart)) return;
+  document.querySelectorAll('canvas').forEach(function(canvas){
+    var chart = Chart.getChart(canvas);
+    if (!chart || chart.config.type !== 'radar') return;
+    chart.resize();
+    if (!radarMesurable(chart)) return;
+    centrerRadar(chart);
+    chart.update('none');
+  });
+};
 
 /* ---------- Des étiquettes courtes, parce qu'elles coûtent du rayon ----------
    Sur un radar, la place prise par une étiquette est prise sur la figure : le
@@ -3849,7 +3878,7 @@ renderRadar = function(rows){
       label: 'NF moyenne', data: values,
       backgroundColor: 'rgba(10,132,255,0.18)', borderColor: '#0A84FF',
       pointBackgroundColor: '#0A84FF', borderWidth: 2 }] },
-    options: { responsive: true, maintainAspectRatio: false,
+    options: { responsive: true, maintainAspectRatio: false, animation: false,
       /* Juste ce qu'il faut pour que « Cheval d'arçons » ne soit pas rogné —
          chaque pixel de marge est un pixel de moins pour le graphique. */
       layout: { padding: { top: 2, bottom: 0, left: 4, right: 4 } },
@@ -4173,7 +4202,7 @@ renderCompareRadar = function(A, B, nomA, nomB){
     data: { labels: labels, datasets: [
       jeu(nomA, mA, COULEUR_FICHE, 'rgba(10,132,255,0.16)'),
       jeu(nomB, mB, COULEUR_AUTRE, 'rgba(255,159,10,0.16)') ] },
-    options: { responsive: true, maintainAspectRatio: false,
+    options: { responsive: true, maintainAspectRatio: false, animation: false,
       // Chart.js réserve déjà la place des étiquettes à l'intérieur de la zone :
       // toute marge ajoutée ici est prise sur le diamètre du radar. Le seul
       // rembourrage haut sert à laisser passer l'avertissement au-dessus de la
@@ -5535,6 +5564,14 @@ async function ouvrirDepuisAccueil(disc, id, onglet, source, historique){
     // intermédiaire n'est peint.
     document.body.classList.remove('sur-recherche');
     setTab(destination);
+    requestAnimationFrame(function(){
+      // Chart.js observe lui-même le retour à une largeur visible pendant la
+      // première frame. On intervient après la suivante et ses observateurs,
+      // dans une seule tâche différée — jamais dans une boucle de rendu.
+      requestAnimationFrame(function(){
+        setTimeout(function(){ window.recentrerRadarsVisibles(); }, 0);
+      });
+    });
     return true;
   }catch(e){
     if (navigation !== navigationProfil) return false;
