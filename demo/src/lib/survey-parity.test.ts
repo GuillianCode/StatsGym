@@ -1,5 +1,6 @@
 // `?raw` évite toute dépendance à Node : Vite fournit le fichier tel quel.
 import html from '../../../published-demo/index.html?raw';
+import reactHtml from '../../index.html?raw';
 import {describe, expect, it} from 'vitest';
 import {accessOptionsByProfile, accessTitles, ideaLabel, priceScales, statsQuestionLabels} from '@statsgym/contracts';
 
@@ -65,5 +66,13 @@ describe('Parité entre la page publiée et le contrat', () => {
     expect(html).not.toContain('instagram_story');
     expect(html).not.toContain('prepareStoryFile');
     expect(html).not.toContain('navigator.canShare');
+  });
+
+  it('ne publie plus l’ancienne image de story', () => {
+    for (const page of [html, reactHtml]) {
+      expect(page).not.toContain('statsgym-story');
+      expect(page).not.toContain('og:image');
+      expect(page).not.toContain('summary_large_image');
+    }
   });
 });
