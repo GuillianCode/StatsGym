@@ -8,6 +8,7 @@
     "build": "npm --workspace demo run build",
     "test": "npm --workspace demo run test",
     "test:e2e": "npm --workspace demo run test:e2e",
+    "test:published": "npm --workspace demo run test:published",
     "typecheck": "npm --workspace demo run typecheck"
   },
   "engines": {"node": ">=22"}

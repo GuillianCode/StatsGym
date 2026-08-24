@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:published": "playwright test --config=playwright.published.config.ts"
   },
   "dependencies": {
     "@statsgym/contracts": "1.0.0",
