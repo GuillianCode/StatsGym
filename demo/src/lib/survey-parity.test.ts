@@ -55,4 +55,15 @@ describe('Parité entre la page publiée et le contrat', () => {
     expect(html).toContain("'x-posthog-session-id'");
     expect(html).not.toContain("posthog.capture('survey_response_submitted'");
   });
+
+  it('propose uniquement le partage natif avec attribution', () => {
+    expect(html).toContain('id="share-native"');
+    expect(html).toContain('Partager StatsGym');
+    expect(html).toContain("shareAnalytics('native_share')");
+    expect(html).toContain("url.searchParams.set('share_id',getShareId())");
+    expect(html).not.toContain('id="share-instagram"');
+    expect(html).not.toContain('instagram_story');
+    expect(html).not.toContain('prepareStoryFile');
+    expect(html).not.toContain('navigator.canShare');
+  });
 });

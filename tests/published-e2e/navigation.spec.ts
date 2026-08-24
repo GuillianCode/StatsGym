@@ -7,6 +7,34 @@ async function ouvrirFiche(page: import('@playwright/test').Page) {
   await expect(page.locator('.dock-btn[data-tab="apercu"]')).toHaveClass(/active/);
 }
 
+async function afficherRemerciement(page: import('@playwright/test').Page) {
+  await ouvrirFiche(page);
+  await page.locator('.dock-btn[data-tab="classement"]').click();
+  const next = page.locator('#wizard-next');
+  await page.evaluate(() => {
+    for (const [name, value] of Object.entries({profil: 'gymnaste', discipline: 'Gymnastique artistique féminine', context: 'Loisir'}))
+      document.querySelector<HTMLInputElement>(`[name="${name}"]`)!.value = value;
+  });
+  await next.click();
+  await page.evaluate(() => {
+    for (let index = 0; index < 5; index += 1)
+      document.querySelector<HTMLInputElement>(`[name="feature_${index}"][value="5"]`)!.checked = true;
+    document.querySelector<HTMLInputElement>('[name="stats_clarity"]')!.value = '5';
+    document.querySelector<HTMLInputElement>('[name="stats_preference"]')!.value = 'balanced';
+  });
+  await next.click();
+  await page.evaluate(() => {
+    document.querySelector<HTMLInputElement>('[name="access_model"][value="current_ok"]')!.checked = true;
+  });
+  await next.click();
+  await next.click();
+  await page.locator('[name="first_name"]').fill('Test');
+  await page.locator('[name="last_name"]').fill('Partage');
+  await page.locator('[name="email"]').fill('partage@example.com');
+  await next.click();
+  await expect(page.locator('.share-success')).toBeVisible();
+}
+
 test('change les onglets immédiatement et synchronise l’historique', async ({page}) => {
   await ouvrirFiche(page);
 
@@ -188,6 +216,63 @@ test('tente de lire la vidéo de remerciement automatiquement avec le son', asyn
   await expect.poll(() => page.evaluate(() =>
     (window as typeof window & {videoPlayCalls: number}).videoPlayCalls,
   )).toBeGreaterThan(0);
+});
+
+test('propose un seul bouton et transmet un lien attribué au partage natif', async ({page}) => {
+  await page.addInitScript(() => {
+    (window as typeof window & {shareCalls: ShareData[]}).shareCalls = [];
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: async (data: ShareData) => {
+        (window as typeof window & {shareCalls: ShareData[]}).shareCalls.push(data);
+      },
+    });
+  });
+  await afficherRemerciement(page);
+  await page.evaluate(() => {
+    (window as typeof window & {analyticsEvents: {event: string; properties: Record<string, unknown>}[]}).analyticsEvents = [];
+    (window as typeof window & {StatsGymAnalytics: {capture: (event: string, properties: Record<string, unknown>) => void}}).StatsGymAnalytics.capture = (event, properties) => {
+      (window as typeof window & {analyticsEvents: {event: string; properties: Record<string, unknown>}[]}).analyticsEvents.push({event, properties});
+    };
+  });
+
+  const buttons = page.locator('.share-actions button');
+  await expect(buttons).toHaveCount(1);
+  await expect(buttons).toHaveText('Partager StatsGym');
+  await buttons.click();
+
+  const calls = await page.evaluate(() => (window as typeof window & {shareCalls: ShareData[]}).shareCalls);
+  expect(calls).toHaveLength(1);
+  expect(calls[0].title).toBe('Découvre StatsGym');
+  expect(calls[0].text).toBe('Teste la démo StatsGym et donne ton avis !');
+  expect(calls[0].files).toBeUndefined();
+  const url = new URL(calls[0].url!.toString());
+  expect(url.searchParams.get('utm_source')).toBe('participant_share');
+  expect(url.searchParams.get('utm_medium')).toBe('native_share');
+  expect(url.searchParams.get('utm_campaign')).toBe('new_sondage');
+  expect(url.searchParams.get('share_id')).toBeTruthy();
+  await expect(page.locator('#share-status')).toHaveText('Partage transmis à l’application choisie.');
+
+  const successfulEvents = await page.evaluate(() => (window as typeof window & {analyticsEvents: {event: string; properties: Record<string, unknown>}[]}).analyticsEvents);
+  expect(successfulEvents.map(({event}) => event)).toEqual(['survey_share_started', 'survey_share_handoff']);
+  expect(successfulEvents.every(({properties}) => properties.share_method === 'native_share')).toBe(true);
+
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'share', {configurable: true, value: async () => {throw new DOMException('cancelled', 'AbortError');}});
+  });
+  await buttons.click();
+  await expect(page.locator('#share-status')).toHaveText('Partage annulé.');
+  const cancelledEvents = await page.evaluate(() => (window as typeof window & {analyticsEvents: {event: string; properties: Record<string, unknown>}[]}).analyticsEvents);
+  expect(cancelledEvents.map(({event}) => event)).toEqual(['survey_share_started', 'survey_share_handoff', 'survey_share_started']);
+});
+
+test('explique pourquoi le partage natif est indisponible', async ({page}) => {
+  await page.addInitScript(() => Object.defineProperty(navigator, 'share', {configurable: true, value: undefined}));
+  await afficherRemerciement(page);
+
+  await expect(page.locator('.share-actions button')).toHaveCount(1);
+  await expect(page.locator('#share-native')).toBeDisabled();
+  await expect(page.locator('#share-status')).toHaveText('Le partage natif sera disponible sur mobile une fois le site ouvert en HTTPS.');
 });
 
 declare global {
