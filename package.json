@@ -1,0 +1,14 @@
+{
+  "name": "statsgym",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": ["demo", "packages/contracts"],
+  "scripts": {
+    "dev": "npm --workspace demo run dev",
+    "build": "npm --workspace demo run build",
+    "test": "npm --workspace demo run test",
+    "test:e2e": "npm --workspace demo run test:e2e",
+    "typecheck": "npm --workspace demo run typecheck"
+  },
+  "engines": {"node": ">=22"}
+}

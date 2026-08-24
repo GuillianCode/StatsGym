@@ -1,0 +1,4 @@
+project_id = "statsgym"
+
+[functions.submit-survey]
+verify_jwt = true
