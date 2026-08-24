@@ -9,6 +9,6 @@ export default function ComparisonChart({first, second, firstValues, secondValue
   const values = (rows: {name: string; value: number}[]) => labels.map(label => rows.find(row => row.name === label)?.value ?? null);
   return <div className="chart-wrap tall"><Radar data={{labels, datasets: [
     {label: first.firstName, data: values(firstValues), borderColor: '#0a85ff', backgroundColor: 'rgba(10,133,255,.16)'},
-    {label: second.firstName, data: values(secondValues), borderColor: '#bf5af2', backgroundColor: 'rgba(191,90,242,.12)'},
+    {label: second.firstName, data: values(secondValues), borderColor: '#FF9F0A', backgroundColor: 'rgba(255,159,10,.12)'},
   ]}} options={{responsive: true, maintainAspectRatio: false, scales: {r: {ticks: {display: false}, grid: {color: 'rgba(255,255,255,.12)'}, angleLines: {color: 'rgba(255,255,255,.12)'}, pointLabels: {color: '#dbeafe'}}}, plugins: {legend: {labels: {color: '#fff'}}}}}/></div>;
 }
