@@ -112,7 +112,7 @@ export function Survey() {
     try {
       const result = await submitSurvey(payload());
       setSuccess(result); sessionStorage.removeItem(storageKey);
-      if (!result.simulated) analytics.capture('survey_response_submitted', {survey: 'new-sondage', profile, discipline: state.discipline, club_name: state.clubName || null});
+      if (!result.simulated) analytics.capture('survey_response_submitted', {survey: 'new-sondage', profile, discipline: state.discipline});
     } catch {
       setError('Impossible d’enregistrer votre réponse. Vérifiez votre connexion puis réessayez.');
       analytics.capture('survey_submission_failed', {survey: 'new-sondage'});

@@ -1,9 +1,14 @@
 type Properties = Record<string, string | number | boolean | null | undefined>;
 
 let captureImpl = (_event: string, _properties?: Properties) => {};
+const allowedPropertyNames = new Set(['survey', 'step_number', 'profile', 'discipline', 'tab_name', 'share_medium', 'profile_role']);
+
+function withoutPersonalData(properties?: Properties) {
+  return Object.fromEntries(Object.entries(properties ?? {}).filter(([name]) => allowedPropertyNames.has(name)));
+}
 
 export const analytics = {
-  capture(event: string, properties?: Properties) { captureImpl(event, properties); },
+  capture(event: string, properties?: Properties) { captureImpl(event, withoutPersonalData(properties)); },
 };
 
 export async function initializeAnalytics() {

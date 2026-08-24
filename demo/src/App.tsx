@@ -14,14 +14,14 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('apercu');
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get('utm_source') === 'participant_share') analytics.capture('shared_demo_opened', {campaign: params.get('utm_campaign'), share_medium: params.get('utm_medium')});
+    if (params.get('utm_source') === 'participant_share') analytics.capture('shared_demo_opened', {share_medium: params.get('utm_medium')});
     const onPop = () => {setView('home'); setTab('apercu');};
     addEventListener('popstate', onPop); return () => removeEventListener('popstate', onPop);
   }, []);
 
   const open = (destination: Tab) => {
     setTab(destination); setView('profile'); history.pushState({statsgym: true, view: 'profile', discipline, tab: destination}, '');
-    analytics.capture('athlete_profile_opened', {athlete_name: `${visibleAthletes[discipline].firstName} ${visibleAthletes[discipline].lastName}`, discipline});
+    analytics.capture('athlete_profile_opened', {profile_role: 'visible_demo', discipline});
   };
   const back = () => {setView('home'); setTab('apercu'); history.replaceState({statsgym: true, view: 'home'}, '');};
   const changeTab = (value: Tab) => {setTab(value); history.replaceState({statsgym: true, view: 'profile', discipline, tab: value}, ''); analytics.capture('athlete_tab_viewed', {discipline, tab_name: value});};
