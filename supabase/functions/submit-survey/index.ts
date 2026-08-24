@@ -71,6 +71,13 @@ Deno.serve(async request => {
     waitlist_opt_in: body.waitlist_opt_in,
   };
   const result = await supabase.from('survey_responses').upsert(insert, {onConflict: 'submission_id', ignoreDuplicates: true});
-  if (result.error) return reply(502, {error: 'Enregistrement indisponible'}, origin);
+  if (result.error) {
+    console.error('survey_response_upsert_failed', {
+      code: result.error.code,
+      message: result.error.message,
+      hint: result.error.hint,
+    });
+    return reply(502, {error: 'Enregistrement indisponible'}, origin);
+  }
   return reply(201, {ok: true}, origin);
 });
