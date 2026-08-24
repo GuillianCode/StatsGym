@@ -142,6 +142,54 @@ test('annule un chargement devenu obsolète et supprime les voiles noirs', async
   expect(resultat).toEqual({vue: 'home', accueil: true, voileHaut: 'none', voileBas: 'none'});
 });
 
+test('tente de lire la vidéo de remerciement automatiquement avec le son', async ({page}) => {
+  await ouvrirFiche(page);
+  await page.locator('.dock-btn[data-tab="classement"]').click();
+  await page.evaluate(() => {
+    (window as typeof window & {videoPlayCalls: number}).videoPlayCalls = 0;
+    HTMLMediaElement.prototype.play = function () {
+      (window as typeof window & {videoPlayCalls: number}).videoPlayCalls += 1;
+      return Promise.resolve();
+    };
+  });
+
+  const next = page.locator('#wizard-next');
+  await page.evaluate(() => {
+    for (const [name, value] of Object.entries({
+      profil: 'gymnaste',
+      discipline: 'Gymnastique artistique féminine',
+      context: 'Loisir',
+    })) document.querySelector<HTMLInputElement>(`[name="${name}"]`)!.value = value;
+  });
+  await next.click();
+
+  await page.evaluate(() => {
+    for (let index = 0; index < 5; index += 1)
+      document.querySelector<HTMLInputElement>(`[name="feature_${index}"][value="5"]`)!.checked = true;
+    document.querySelector<HTMLInputElement>('[name="stats_clarity"]')!.value = '5';
+    document.querySelector<HTMLInputElement>('[name="stats_preference"]')!.value = 'balanced';
+  });
+  await next.click();
+
+  await page.evaluate(() => {
+    document.querySelector<HTMLInputElement>('[name="access_model"][value="current_ok"]')!.checked = true;
+  });
+  await next.click();
+  await next.click();
+  await page.locator('[name="first_name"]').fill('Test');
+  await page.locator('[name="last_name"]').fill('Autoplay');
+  await page.locator('[name="email"]').fill('autoplay@example.com');
+  await next.click();
+
+  const video = page.locator('.thank-you-video video');
+  await expect(video).toBeVisible();
+  await expect(video).toHaveAttribute('autoplay', '');
+  await expect(video).not.toHaveAttribute('muted', '');
+  await expect.poll(() => page.evaluate(() =>
+    (window as typeof window & {videoPlayCalls: number}).videoPlayCalls,
+  )).toBeGreaterThan(0);
+});
+
 declare global {
   interface Window {
     afficherAccueil(): void;
