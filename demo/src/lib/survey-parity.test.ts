@@ -68,11 +68,15 @@ describe('Parité entre la page publiée et le contrat', () => {
     expect(html).not.toContain('navigator.canShare');
   });
 
-  it('ne publie plus l’ancienne image de story', () => {
+  it('publie l’aperçu horizontal du site sans restaurer l’ancienne story', () => {
     for (const page of [html, reactHtml]) {
       expect(page).not.toContain('statsgym-story');
-      expect(page).not.toContain('og:image');
-      expect(page).not.toContain('summary_large_image');
+      expect(page).toContain('https://guilliancode.github.io/StatsGym/assets/share/statsgym-preview.png');
+      expect(page).toContain('property="og:image"');
+      expect(page).toContain('property="og:image:width" content="1200"');
+      expect(page).toContain('property="og:image:height" content="630"');
+      expect(page).toContain('name="twitter:card" content="summary_large_image"');
+      expect(page).toContain('name="twitter:image"');
     }
   });
 });

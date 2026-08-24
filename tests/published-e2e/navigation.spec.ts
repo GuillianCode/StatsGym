@@ -275,6 +275,16 @@ test('explique pourquoi le partage natif est indisponible', async ({page}) => {
   await expect(page.locator('#share-status')).toHaveText('Le partage natif sera disponible sur mobile une fois le site ouvert en HTTPS.');
 });
 
+test('sert un aperçu social horizontal au format PNG', async ({request}) => {
+  const response = await request.get('./assets/share/statsgym-preview.png');
+  expect(response.status()).toBe(200);
+  expect(response.headers()['content-type']).toContain('image/png');
+  const image = await response.body();
+  expect(image.subarray(1, 4).toString()).toBe('PNG');
+  expect(image.readUInt32BE(16)).toBe(1200);
+  expect(image.readUInt32BE(20)).toBe(630);
+});
+
 declare global {
   interface Window {
     afficherAccueil(): void;
