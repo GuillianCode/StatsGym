@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
+<meta name="theme-color" content="#000814">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Stats_Gym — GAM, GAF &amp; GR</title>
 <meta name="description" content="Découvrez la démo StatsGym et partagez votre avis sur les statistiques gymniques.">
@@ -384,7 +385,22 @@ body::-webkit-scrollbar{ display:none; }
 button:focus:not(:focus-visible){ outline:none !important; }
 
 /* Onglets en carrousel : on glisse d'un onglet à l'autre, l'en-tête ne bouge pas. */
-html, body{ height:100%; }
+/* ---------- Une fiche ne défile QUE par l'onglet affiché ----------
+   ⚠ IL Y AVAIT DEUX FAÇONS DE DESCENDRE, ET ELLES NE SE PARLAIENT PAS.
+   L'en-tête est hors de la zone qui défile : le doigt posé dessus ne trouvait
+   aucun panneau à faire glisser, alors c'est LE DOCUMENT qui bougeait — sur
+   iPhone, ce geste replie la barre de Safari et décale toute la page.
+
+   Le retour était alors impossible par le geste normal : l'onglet est en
+   `overscroll-behavior:contain`, son défilement ne remonte pas au document.
+   On revenait bien en haut du contenu, la page restant décalée, et il fallait
+   deviner qu'il fallait retirer ce décalage en tirant sur la bulle du nom.
+   Ça se lisait comme une panne. Maxime a mis longtemps à comprendre.
+
+   Le document ne défile donc plus du tout, et le geste sur l'en-tête ne
+   produit plus rien. Il ne reste qu'une façon de descendre : l'onglet. */
+html, body{ height:100%; overflow:hidden; overscroll-behavior:none; }
+#profileHeader{ touch-action:none; }
 .app{ padding:0 !important; max-width:none !important;
       height:100%; display:flex; flex-direction:column; }
 #screen-profile{ display:flex !important; flex-direction:column;
@@ -1392,12 +1408,113 @@ ul.exemples .ex-avis[hidden]{ display:none; }
    demande était l'inverse. */
 body{ background:#000814; }
 .bg-scene,.noise{ display:none; }
-.statsgym-network-background{ position:fixed; inset:0; z-index:0; display:block; overflow:hidden;
+/* ⚠ `100vh`, PAS `inset:0`. Un élément fixe se cale sur la portion VISIBLE de
+   la page — celle qui reste une fois la barre de Safari dépliée. Le dégradé
+   s'arrêtait donc à la barre, et sous elle réapparaissait le noir plat du
+   document : la bande que Maxime décrit sous le dock, puis « l'écran qui
+   revient » jusqu'au milieu de la barre de recherche.
+
+   Sur iOS, `100vh` a toujours valu la hauteur SANS la barre — la plus grande.
+   Le fond déborde donc derrière elle, et il n'y a plus de couture. `100lvh`
+   dit la même chose, en toutes lettres, aux navigateurs qui le connaissent. */
+.statsgym-network-background{ position:fixed; top:0; left:0; right:0; z-index:0;
+  display:block; overflow:hidden; height:100vh; height:100lvh;
   pointer-events:none; background:linear-gradient(145deg,#000814 0%,#003870 100%); }
+/* Et le document lui-même porte la couleur du haut : partout où le dégradé ne
+   serait pas encore peint — au chargement, ou derrière l'habillage du
+   navigateur — on tombe sur la bonne teinte plutôt que sur du blanc. */
+html{ background:#000814; }
 .statsgym-network-background canvas{ position:absolute !important; inset:0; width:100% !important; height:100% !important; }
-body:not(.sur-recherche) .statsgym-network-background canvas{ display:none; }
+/* ⚠ `visibility`, PAS `display`. Un canevas en `display:none` mesure 0 × 0, et
+   particles.js le remesure à chaque `resize` — or sur iPhone la barre de
+   Safari qui se replie pendant qu'on fait défiler une fiche en émet à la
+   chaîne. La toile passait donc en 0 × 0, et `densityAutoParticles` en tirait
+   la conclusion qu'il fallait zéro particule : les 140 étaient SUPPRIMÉES.
+   On revenait à l'accueil devant un fond vide, définitivement.
+
+   `visibility:hidden` cache sans retirer de la mise en page : la mesure reste
+   juste, les particules survivent. Rien ne se peint de toute façon, la boucle
+   d'animation étant coupée plus bas. */
+body:not(.sur-recherche) .statsgym-network-background canvas{ visibility:hidden; }
 .app{ position:relative; z-index:2; }
-.dock{ z-index:2; }
+.dock{ z-index:5; }
+
+/* ---------- Le document redevient la surface qui défile ----------
+   Safari ne réduit sa barre d'adresse QUE si le document défile. Un
+   défilement intérieur, si fluide soit-il, ne la réduit jamais — c'est une
+   limite d'iOS, pas un réglage. Tant que les cinq onglets défilaient chacun
+   dans leur boîte, la barre restait dépliée et mangeait un sixième de l'écran.
+
+   On rend donc le défilement au document. Et comme il devient LE SEUL, le
+   piège des deux façons de descendre — corrigé le 24/08 en interdisant au
+   document de bouger — disparaît par unification au lieu de l'être par
+   interdiction. La bulle du nom redevient glissable au passage.
+
+   Ce qui rend la chose possible : la piste porte désormais une hauteur, celle
+   de l'onglet affiché. Sans elle, le document se serait ouvert sur la hauteur
+   du plus long des cinq — cinq mille pixels de vide sur l'Aperçu. */
+html, body{ height:auto !important; min-height:100%; overflow:visible !important;
+            overscroll-behavior:auto; }
+/* L'accueil, lui, reste immobile : il tient d'un seul tenant. */
+body.sur-recherche{ overflow:hidden !important; overscroll-behavior:none; }
+.app{ height:auto !important; min-height:100vh; min-height:100lvh; }
+#screen-profile{ flex:none !important; min-height:100vh; min-height:100lvh; }
+/* `flex-start` est indispensable : étirés à la hauteur de la piste, les
+   onglets auraient renvoyé cette hauteur quand on la leur demande, et la
+   mesure se serait mordu la queue. */
+.tabs-piste{ flex:none !important; align-items:flex-start !important;
+             overflow:hidden !important; }
+.tabs-piste > .tab-content{ overflow:visible !important; height:auto !important; }
+/* La zone morte n'a plus de raison d'être : le doigt sur la bulle du nom fait
+   défiler le document, comme partout ailleurs sur la page. */
+#profileHeader{ touch-action:auto !important; }
+
+/* ---------- Les deux bords de l'écran ----------
+   `viewport-fit=cover` fait déjà courir la page jusqu'aux bords : le contenu
+   passe derrière l'encoche en haut et derrière la barre de Safari en bas. Sans
+   traitement, une ligne de tableau se coupait net sur l'encoche — on lisait
+   une moitié de chiffre.
+
+   Deux voiles fixes règlent ça. Ils ne repoussent RIEN : la bulle du nom garde
+   sa marge sous l'encoche, le dock garde la sienne au-dessus de la barre
+   d'accueil. Ils se contentent d'estomper ce qui passe dessous.
+
+   Le dégradé est double, et c'est ce qui fait l'effet iOS :
+     - `backdrop-filter` floute ce qu'il y a derrière ;
+     - `mask-image` fait DISPARAÎTRE ce floutage en descendant, si bien que le
+       flou lui-même s'estompe au lieu de s'arrêter sur une ligne nette.
+   Un seul dégradé de couleur aurait posé un rectangle sombre ; c'est le flou
+   qui s'évanouit qui donne l'impression que la page continue.
+
+   Sur un téléphone sans encoche, `env(safe-area-inset-*)` vaut 0 : les voiles
+   se réduisent à leur retombée, et l'effet reste juste. Là où
+   `backdrop-filter` n'existe pas — quelques Android — il ne reste que le
+   dégradé de couleur, ce qui suffit à ne pas couper le texte net. */
+#screen-profile::before,
+#screen-profile::after{
+  position:fixed; left:0; right:0; z-index:3; content:''; pointer-events:none;
+}
+#screen-profile::before{
+  top:0; height:calc(env(safe-area-inset-top, 0px) + 22px);
+  background:linear-gradient(to bottom, rgba(0,8,20,.80), rgba(0,8,20,0));
+  -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+  -webkit-mask-image:linear-gradient(to bottom, #000 45%, transparent 100%);
+          mask-image:linear-gradient(to bottom, #000 45%, transparent 100%);
+}
+/* En bas, le voile monte plus haut : il doit couvrir la retombée sous la barre
+   d'accueil ET la hauteur du dock, pour que celui-ci repose sur quelque chose
+   plutôt que de flotter sur un tableau. */
+#screen-profile::after{
+  bottom:0; height:calc(env(safe-area-inset-bottom, 0px) + 74px);
+  background:linear-gradient(to top, rgba(0,8,20,.85), rgba(0,8,20,0));
+  -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+  -webkit-mask-image:linear-gradient(to top, #000 45%, transparent 100%);
+          mask-image:linear-gradient(to top, #000 45%, transparent 100%);
+}
+/* L'accueil tient d'un seul tenant et ne fait rien passer sous les bords : un
+   voile n'y aurait rien à estomper, et assombrirait le décor pour rien. */
+body.sur-recherche #screen-profile::before,
+body.sur-recherche #screen-profile::after{ display:none; }
 /* ---------- Les écrans courts ----------
    La page doit tenir d'un seul tenant, sans défilement : c'est la première
    chose qu'on voit en arrivant d'une story, et un pouce qui doit faire défiler
@@ -5637,6 +5754,103 @@ window.reglerComparaisonAvantRendu = function(){
   cmpNoteEvo = reglage.evoNote;
 };
 
+/* ---------- La piste porte la hauteur de l'onglet affiché ----------
+   Corollaire du défilement rendu au document (voir le CSS plus haut). Les cinq
+   onglets sont côte à côte sur une piste horizontale : sans hauteur explicite,
+   elle prendrait celle du plus long, et l'Aperçu s'ouvrirait sur cinq mille
+   pixels de vide.
+
+   Trois choses à tenir, et le socle ne les tient plus :
+
+     - la HAUTEUR, recalculée à chaque changement d'onglet et à chaque fois que
+       le contenu bouge (les graphiques naissent après le premier rendu) ;
+     - la POSITION de lecture, qui appartenait à chaque onglet et appartient
+       maintenant au document seul : on la range et on la ressort ;
+     - le RETOUR EN HAUT quand on touche l'onglet déjà ouvert. Celui du socle
+       remonte `onglet.scrollTop`, qui vaut désormais toujours zéro : il ne
+       fait plus rien, et le nôtre prend le relais. */
+(function(){
+  var piste = document.querySelector('.tabs-piste');
+  var dock  = document.querySelector('.dock');
+  if (!piste || !dock) return;
+
+  var memoire = {};
+
+  function indexCourant(){
+    var n = piste.children.length - 1;
+    return Math.max(0, Math.min(n,
+      Math.round(piste.scrollLeft / Math.max(1, piste.clientWidth))));
+  }
+
+  /* Pendant le glissement, DEUX onglets sont à l'écran. On prend la plus
+     grande des deux hauteurs : prendre celle d'arrivée trop tôt aurait coupé
+     le sortant, et l'inverse aurait fait sauter la page à mi-chemin. */
+  /* `vise` : l'onglet vers lequel on part. Il faut le compter AVANT que le
+     glissement ne commence — sinon la piste garde un instant la hauteur du
+     départ, et la position de lecture qu'on restaure est écrêtée à ce
+     qu'elle permet. Mesuré : on revenait à 617 au lieu de 2000. */
+  function caler(vise){
+    var large = Math.max(1, piste.clientWidth);
+    var pos = piste.scrollLeft / large;
+    var i = Math.max(0, Math.min(piste.children.length - 1, Math.floor(pos)));
+    var j = Math.min(piste.children.length - 1, i + 1);
+    var h = piste.children[i] ? piste.children[i].offsetHeight : 0;
+    if (pos > i + 0.001 && piste.children[j])
+      h = Math.max(h, piste.children[j].offsetHeight);
+    if (vise != null && piste.children[vise])
+      h = Math.max(h, piste.children[vise].offsetHeight);
+    if (h) piste.style.height = h + 'px';
+  }
+
+  /* Le contenu d'un onglet grandit après coup : les graphiques se dessinent,
+     les tableaux se remplissent. Sans ce guet, la page gardait la hauteur
+     qu'elle avait à l'ouverture et la fin de l'onglet devenait inatteignable. */
+  /* ⚠ `caler` prend un index : on ne le branche jamais NU sur un écouteur.
+     Un ResizeObserver passe un tableau, un événement passe un Event — et
+     `piste.children[<un Event>]` vaut `undefined`, ce qui aurait été sans
+     effet ici, mais pour de mauvaises raisons. On enveloppe. */
+  var recaler = function(){ caler(); };
+  var guet = new ResizeObserver(recaler);
+  Array.prototype.forEach.call(piste.children, function(t){ guet.observe(t); });
+  piste.addEventListener('scroll', recaler, { passive: true });
+  window.addEventListener('resize', recaler);
+
+  /* Changer d'onglet : on range la position de celui qu'on quitte, on ressort
+     celle de celui qu'on ouvre. C'est ce que faisait le socle gratuitement,
+     chaque onglet ayant son propre défilement. */
+  var setTabAvantHauteur = setTab;
+  setTab = function(nom){
+    var partant = ONGLETS[indexCourant()];
+    if (partant) memoire[partant] = window.scrollY;
+    var sortie = setTabAvantHauteur(nom);
+    requestAnimationFrame(function(){
+      caler(ONGLETS.indexOf(nom));
+      window.scrollTo(0, memoire[nom] || 0);
+    });
+    return sortie;
+  };
+
+  /* Une autre fiche, une autre lecture : les positions rangées ne valent plus. */
+  var openProfileAvantMemoire = openProfile;
+  openProfile = function(id){
+    memoire = {};
+    return openProfileAvantMemoire(id);
+  };
+
+  /* Toucher l'onglet déjà ouvert ramène en haut — le geste d'iOS. */
+  dock.querySelectorAll('.dock-btn').forEach(function(bouton, k){
+    bouton.addEventListener('click', function(){
+      if (indexCourant() !== k) return;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Le filet : `behavior:'smooth'` est ignoré sans un mot par certains
+      // navigateurs, et le bouton ne ferait alors rien du tout.
+      setTimeout(function(){ if (window.scrollY > 2) window.scrollTo(0, 0); }, 400);
+    });
+  });
+
+  caler();
+})();
+
 /* ---------- La pastille du sélecteur de discipline ----------
    Elle se cale sur le bouton actif, et le suit. On mesure à chaque fois plutôt
    que de calculer un tiers de largeur : les trois boutons sont en grille, donc
@@ -5649,9 +5863,18 @@ window.reglerComparaisonAvantRendu = function(){
   pilule.className = 'disc-pilule sans-transition';
   barre.insertBefore(pilule, barre.firstChild);
 
+  /* ⚠ NE JAMAIS MESURER UN ÉCRAN CACHÉ. Sur une fiche, l'accueil est en
+     `display:none` : le bouton actif mesure alors 0 de large et 0 depuis la
+     gauche. `placer` écrivait consciencieusement `width:0` et `translateX(0)`,
+     et la pastille devenait une barre collée à gauche de GAM.
+
+     Ce n'était pas visible en soi — l'accueil est caché — mais rien ne
+     remesurait au retour : on retrouvait la barre. Et le déclencheur ne
+     manquait pas : sur iPhone, la barre de Safari qui se replie pendant qu'on
+     fait défiler une fiche émet des `resize` à la chaîne. */
   function placer(){
     var actif = barre.querySelector('.disc-btn.active');
-    if (!actif) return;
+    if (!actif || !actif.offsetWidth) return;
     pilule.style.width = actif.offsetWidth + 'px';
     pilule.style.transform = 'translateX(' + actif.offsetLeft + 'px)';
   }
@@ -5675,6 +5898,13 @@ window.reglerComparaisonAvantRendu = function(){
      donc celle des boutons. */
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(placer);
   window.addEventListener('load', placer);
+
+  /* Revenir à l'accueil, c'est retrouver une barre mesurable. Tout ce qui a
+     été refusé pendant qu'elle était cachée se rattrape ici. Même signal que
+     la toile : la classe sur <body>, quel que soit le chemin emprunté. */
+  new MutationObserver(function(){
+    if (document.body.classList.contains('sur-recherche')) requestAnimationFrame(placer);
+  }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 })();
 
 /* ---------- Deux listes tirées du même annuaire ----------

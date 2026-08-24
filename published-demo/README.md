@@ -1,8 +1,8 @@
 # Démo HTML publiée
 
-Cette copie provient de `new-sondage/` sur `origin/main` du dépôt
-`rappmaxime-web/suivi-gymnaste-web`, au commit source
-`4b56834a0917b42bb5e45daaf1d3843c6bf041f6`.
+Cette copie provient de `new-sondage/` du dépôt
+`rappmaxime-web/suivi-gymnaste-web`, au commit source exact
+`ecc4133ec1085d434a3f78ce0f128664438786ae`.
 
 Les seules adaptations locales concernent l’hébergement GitHub Pages : chemins
 des médias, configuration publique PostHog et envoi du questionnaire vers

@@ -5,7 +5,7 @@ visuellement la version `new-sondage` sans dépendre de son générateur HTML.
 
 ## Structure
 
-- `published-demo/` : copie adaptée de `origin/main:new-sondage` publiée sur GitHub Pages.
+- `published-demo/` : copie adaptée du commit source `ecc4133` de `new-sondage`, publiée sur GitHub Pages.
 - `demo/` : chantier React + TypeScript indépendant, conservé pour la suite.
 - `demo/src/data/athletes.snapshot.json` : snapshot autonome de trois profils
   et de leurs trois partenaires de comparaison.
