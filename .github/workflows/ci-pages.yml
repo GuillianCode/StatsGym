@@ -1,4 +1,4 @@
-name: Tests et GitHub Pages
+name: Vérification React et démo GitHub Pages
 
 on:
   push:
@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
+  verify_react:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,19 +34,25 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY }}
           VITE_POSTHOG_HOST: https://eu.i.posthog.com
-      - uses: actions/upload-pages-artifact@v3
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        with:
-          path: demo/dist
-
-  deploy:
+  deploy_static_demo:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: verify
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Configurer l'endpoint du questionnaire
+        env:
+          SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+        run: |
+          node -e "const fs=require('fs'); const url=process.env.SUPABASE_URL; if (!url) throw new Error('La variable VITE_SUPABASE_URL est requise pour publier le questionnaire.'); const endpoint=url.replace(/\\/$/, '') + '/functions/v1/submit-survey'; fs.writeFileSync('published-demo/runtime-config.js', 'window.STATSGYM_CONFIG = Object.freeze({surveyEndpoint: ' + JSON.stringify(endpoint) + '});\\n');"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: published-demo
       - name: Publier
         id: deployment
         uses: actions/deploy-pages@v4

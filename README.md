@@ -5,7 +5,8 @@ visuellement la version `new-sondage` sans dépendre de son générateur HTML.
 
 ## Structure
 
-- `demo/` : application React + TypeScript déployée sur GitHub Pages.
+- `published-demo/` : démo HTML stable publiée sur GitHub Pages.
+- `demo/` : chantier React + TypeScript indépendant, conservé pour la suite.
 - `demo/src/data/athletes.snapshot.json` : snapshot autonome de trois profils
   et de leurs trois partenaires de comparaison.
 - `packages/contracts/` : contrat partagé du questionnaire.
@@ -36,11 +37,10 @@ npm run test:e2e
 
 ## Déploiement
 
-GitHub Actions construit `demo/dist` et le publie sur GitHub Pages. Les
-variables publiques `VITE_SUPABASE_URL` et `VITE_POSTHOG_KEY` sont définies
-comme variables du dépôt. L’Edge Function est un endpoint public protégé par
-validation stricte, honeypot et limitation de débit ; aucune clé Supabase n’est
-embarquée dans le navigateur.
+GitHub Actions publie directement `published-demo/` sur GitHub Pages. Au
+déploiement, il y injecte dans `runtime-config.js` l’URL publique de l’Edge
+Function Supabase ; aucune clé Supabase n’est embarquée dans le navigateur.
+Le chantier React reste vérifié par le workflow, mais n’est pas publié.
 
 Le workflow Supabase est volontairement manuel. Il applique les migrations et
 déploie l’Edge Function après configuration de `SUPABASE_ACCESS_TOKEN`,
