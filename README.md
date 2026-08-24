@@ -37,8 +37,10 @@ npm run test:e2e
 ## Déploiement
 
 GitHub Actions construit `demo/dist` et le publie sur GitHub Pages. Les
-variables publiques `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` et
-`VITE_POSTHOG_KEY` sont définies comme variables du dépôt.
+variables publiques `VITE_SUPABASE_URL` et `VITE_POSTHOG_KEY` sont définies
+comme variables du dépôt. L’Edge Function est un endpoint public protégé par
+validation stricte, honeypot et limitation de débit ; aucune clé Supabase n’est
+embarquée dans le navigateur.
 
 Le workflow Supabase est volontairement manuel. Il applique les migrations et
 déploie l’Edge Function après configuration de `SUPABASE_ACCESS_TOKEN`,
