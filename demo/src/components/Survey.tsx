@@ -62,9 +62,9 @@ export function Survey() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState<{simulated: boolean} | null>(null);
-  const [storyReady, setStoryReady] = useState(false);
   const [shareStatus, setShareStatus] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
+  const shareIdRef = useRef(crypto.randomUUID());
   const profile = state.profil || 'gymnaste';
 
   const eventContext = () => ({survey: 'new-sondage', survey_schema_version: surveySchemaVersion, profile: state.profil || null, profile_label: state.profil ? profileLabels[state.profil] : null});
@@ -122,26 +122,21 @@ export function Survey() {
   };
 
   const shareLink = async () => {
-    const url = new URL(location.href); url.searchParams.set('utm_source', 'participant_share'); url.searchParams.set('utm_medium', 'native_share'); url.searchParams.set('utm_campaign', 'new_sondage');
-    analytics.capture('survey_share_started', {...eventContext(), share_method: 'native_share'});
-    await navigator.share?.({title: 'Découvre StatsGym', text: 'Teste la démo StatsGym et donne ton avis !', url: url.toString()});
-    analytics.capture('survey_share_handoff', {...eventContext(), share_method: 'native_share'});
-  };
-  const shareStory = async () => {
-    const response = await fetch(`${import.meta.env.BASE_URL}assets/share/statsgym-story.jpg`);
-    const file = new File([await response.blob()], 'statsgym-story.jpg', {type: 'image/jpeg'});
-    if (!navigator.canShare?.({files: [file]})) throw new Error('unsupported');
-    analytics.capture('survey_share_started', {...eventContext(), share_method: 'instagram_story'});
-    await navigator.share({files: [file], title: 'Découvre StatsGym'});
-    analytics.capture('survey_share_handoff', {...eventContext(), share_method: 'instagram_story'});
+    const url = new URL(location.href); url.search = ''; url.hash = ''; url.searchParams.set('utm_source', 'participant_share'); url.searchParams.set('utm_medium', 'native_share'); url.searchParams.set('utm_campaign', 'new_sondage'); url.searchParams.set('share_id', shareIdRef.current);
+    const shareContext = {...eventContext(), share_id: shareIdRef.current, share_method: 'native_share'};
+    try {
+      analytics.capture('survey_share_started', shareContext);
+      await navigator.share({title: 'Découvre StatsGym', text: 'Teste la démo StatsGym et donne ton avis !', url: url.toString()});
+      analytics.capture('survey_share_handoff', shareContext);
+      setShareStatus('Partage transmis à l’application choisie.');
+    } catch (error) {
+      setShareStatus(error instanceof DOMException && error.name === 'AbortError' ? 'Partage annulé.' : 'Le partage n’est pas disponible sur cet appareil.');
+    }
   };
 
   useEffect(() => {
     if (!success) return;
-    analytics.capture('survey_share_prompt_viewed', {...eventContext(), share_method: 'prompt'});
-    fetch(`${import.meta.env.BASE_URL}assets/share/statsgym-story.jpg`).then(response => {
-      if (!response.ok) throw new Error(); return response.blob();
-    }).then(() => setStoryReady(true)).catch(() => setShareStatus('Impossible de préparer l’image de story.'));
+    analytics.capture('survey_share_prompt_viewed', {...eventContext(), share_id: shareIdRef.current, share_method: 'prompt'});
   }, [success]);
 
   if (success) return <section className="tab-page survey-page"><article className="survey-card glass-panel survey-success">
@@ -149,8 +144,8 @@ export function Survey() {
     {success.simulated && <p className="local-notice">Mode local : réponse simulée, aucune donnée enregistrée.</p>}
     <p>Il nous aide à construire un StatsGym utile à la communauté gymnique. Avant de partager, découvrez ce petit message.</p>
     <div className="thank-you-video"><video ref={videoRef} controls autoPlay playsInline preload="metadata" aria-label="Merci d’avoir répondu au sondage StatsGym"><source src={`${import.meta.env.BASE_URL}assets/video/statsgym-merci.mp4`} type="video/mp4"/></video></div>
-    <div className="share-actions"><button type="button" disabled={!storyReady} onClick={() => shareStory().then(() => setShareStatus('Le menu de partage est ouvert. Choisissez Instagram puis Story.')).catch(() => setShareStatus('Le partage de fichier n’est pas disponible sur ce navigateur.'))}>{storyReady ? 'Partager en story Instagram' : 'Préparation du partage Instagram…'}</button><button className="secondary" type="button" disabled={!navigator.share} onClick={() => shareLink().then(() => setShareStatus('Merci pour le partage !')).catch(() => setShareStatus('Partage annulé ou indisponible.'))}>Partager la démo autrement</button></div>
-    <p className="share-status" role="status" aria-live="polite">{shareStatus || (!navigator.share ? 'Le partage natif sera disponible sur mobile une fois le site ouvert en HTTPS.' : '')}</p>
+    <div className="share-actions"><button type="button" disabled={!globalThis.isSecureContext || typeof navigator.share !== 'function'} onClick={shareLink}>Partager StatsGym</button></div>
+    <p className="share-status" role="status" aria-live="polite">{shareStatus || (!globalThis.isSecureContext || typeof navigator.share !== 'function' ? 'Le partage natif sera disponible sur mobile une fois le site ouvert en HTTPS.' : '')}</p>
   </article></section>;
 
   return <section className="tab-page survey-page"><article className="survey-card glass-panel">

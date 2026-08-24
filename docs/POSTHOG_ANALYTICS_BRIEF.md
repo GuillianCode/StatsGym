@@ -17,7 +17,7 @@ Ne jamais envoyer à PostHog : prénom, nom, e-mail, idée ou texte libre, inscr
 | `survey_response_submitted` | fonction Supabase, après insertion | réponses structurées et libellés français ; `source: supabase_edge` |
 | `survey_submission_failed` | navigateur | étape, profil et `error_code` contrôlé, jamais le message d’erreur brut |
 | `survey_share_prompt_viewed` | navigateur | profil, méthode `prompt`, identifiant de partage aléatoire si disponible |
-| `survey_share_started` | navigateur | méthode `instagram_story` ou `native_share` |
+| `survey_share_started` | navigateur | méthode `native_share` pour le bouton de partage natif unique |
 | `survey_share_handoff` | navigateur | ouverture réussie de la feuille de partage ; ne prouve pas la publication |
 | `shared_demo_opened` | navigateur | campagne, canal et identifiant de partage aléatoire |
 
@@ -51,7 +51,7 @@ Les budgets ne sont demandés que pour `premium_options` (1–10 €/mois), `coa
 - **StatsGym — Sondage** : funnel depuis la vue de l’étape 1 jusqu’à la réponse serveur, réponses v2 et erreurs. Tous les insights de réponse filtrent `survey_schema_version = 2` et peuvent être filtrés par `profile_label` sans comparer par défaut les petits groupes.
 - **StatsGym — Partage** : invitation, démarrage, feuille de partage et arrivées attribuées. Aucun événement de copie ou téléchargement n’est attendu tant que l’interface ne propose pas ces actions.
 
-Le nom du club n’apparaît dans aucun dashboard. Les événements historiques ne sont pas supprimés.
+Le nom du club n’apparaît dans aucun dashboard. Les événements historiques ne sont pas supprimés : les anciennes valeurs `instagram_story` peuvent donc encore apparaître sur une période antérieure au passage au partage natif unique.
 
 ## Validation après déploiement
 
