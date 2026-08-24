@@ -1,4 +1,5 @@
 import type {SurveyPayload} from '@statsgym/contracts';
+import {analytics} from './analytics';
 
 const timeoutMs = 12_000;
 
@@ -14,7 +15,7 @@ export async function submitSurvey(payload: SurveyPayload): Promise<{simulated: 
   try {
     const response = await fetch(`${url.replace(/\/$/, '')}/functions/v1/submit-survey`, {
       method: 'POST',
-      headers: {'content-type': 'application/json'},
+      headers: {'content-type': 'application/json', ...analytics.tracingHeaders()},
       body: JSON.stringify(payload),
       signal: controller.signal,
     });

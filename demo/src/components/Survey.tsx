@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
-import {accessOptionsByProfile, accessTitles, disciplines, featureKeys, ideaLabel, priceScaleFor, statsQuestionLabels, surveyPayloadSchema, type SurveyPayload} from '@statsgym/contracts';
+import {accessOptionsByProfile, accessTitles, disciplines, featureKeys, ideaLabel, priceScaleFor, profileLabels, statsQuestionLabels, surveyPayloadSchema, surveySchemaVersion, type SurveyPayload} from '@statsgym/contracts';
 import {analytics} from '../lib/analytics';
 import {submitSurvey} from '../lib/survey-api';
 
@@ -67,7 +67,8 @@ export function Survey() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const profile = state.profil || 'gymnaste';
 
-  useEffect(() => {analytics.capture('survey_step_viewed', {survey: 'new-sondage', step_number: step + 1});}, [step]);
+  const eventContext = () => ({survey: 'new-sondage', survey_schema_version: surveySchemaVersion, profile: state.profil || null, profile_label: state.profil ? profileLabels[state.profil] : null});
+  useEffect(() => {analytics.capture('survey_step_viewed', {...eventContext(), step_number: step + 1, step_name: stepLabels[step]});}, [step]);
   useEffect(() => {if (success) videoRef.current?.play().catch(() => {});}, [success]);
 
   const set = <K extends keyof SurveyState>(key: K, value: SurveyState[K]) => setState(previous => ({...previous, [key]: value}));
@@ -91,6 +92,7 @@ export function Survey() {
   };
 
   const payload = (): SurveyPayload => surveyPayloadSchema.parse({
+    survey_schema_version: surveySchemaVersion,
     submission_id: state.submissionId, profil: state.profil, club_name: state.clubName, discipline: state.discipline, context: state.context,
     feature_ratings: Object.fromEntries(featureKeys.map((key, index) => [key, state.ratings[index]])),
     stats_clarity: statsLabels ? state.statsClarity || null : null,
@@ -107,32 +109,36 @@ export function Survey() {
   const next = async () => {
     setError('');
     if (!pageValid()) {setError('Complétez les champs demandés avant de continuer.'); return;}
-    analytics.capture('survey_step_completed', {survey: 'new-sondage', step_number: step + 1});
+    analytics.capture('survey_step_completed', {...eventContext(), step_number: step + 1, step_name: stepLabels[step]});
     if (step < 4) {setStep(value => value + 1); return;}
     setSending(true);
     try {
       const result = await submitSurvey(payload());
       setSuccess(result);
-      if (!result.simulated) analytics.capture('survey_response_submitted', {survey: 'new-sondage', profile, discipline: state.discipline});
     } catch {
       setError('Impossible d’enregistrer votre réponse. Vérifiez votre connexion puis réessayez.');
-      analytics.capture('survey_submission_failed', {survey: 'new-sondage'});
+      analytics.capture('survey_submission_failed', {...eventContext(), step_number: 5, step_name: stepLabels[4], error_code: 'request_failed'});
     } finally {setSending(false);}
   };
 
   const shareLink = async () => {
     const url = new URL(location.href); url.searchParams.set('utm_source', 'participant_share'); url.searchParams.set('utm_medium', 'native_share'); url.searchParams.set('utm_campaign', 'new_sondage');
+    analytics.capture('survey_share_started', {...eventContext(), share_method: 'native_share'});
     await navigator.share?.({title: 'Découvre StatsGym', text: 'Teste la démo StatsGym et donne ton avis !', url: url.toString()});
+    analytics.capture('survey_share_handoff', {...eventContext(), share_method: 'native_share'});
   };
   const shareStory = async () => {
     const response = await fetch(`${import.meta.env.BASE_URL}assets/share/statsgym-story.jpg`);
     const file = new File([await response.blob()], 'statsgym-story.jpg', {type: 'image/jpeg'});
     if (!navigator.canShare?.({files: [file]})) throw new Error('unsupported');
+    analytics.capture('survey_share_started', {...eventContext(), share_method: 'instagram_story'});
     await navigator.share({files: [file], title: 'Découvre StatsGym'});
+    analytics.capture('survey_share_handoff', {...eventContext(), share_method: 'instagram_story'});
   };
 
   useEffect(() => {
     if (!success) return;
+    analytics.capture('survey_share_prompt_viewed', {...eventContext(), share_method: 'prompt'});
     fetch(`${import.meta.env.BASE_URL}assets/share/statsgym-story.jpg`).then(response => {
       if (!response.ok) throw new Error(); return response.blob();
     }).then(() => setStoryReady(true)).catch(() => setShareStatus('Impossible de préparer l’image de story.'));

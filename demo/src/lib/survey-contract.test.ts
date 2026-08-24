@@ -1,7 +1,8 @@
 import {describe, expect, it} from 'vitest';
-import {accessOptionsByProfile, priceScaleFor, surveyPayloadSchema, type Profile} from '@statsgym/contracts';
+import {accessOptionsByProfile, priceScaleFor, surveyAnalyticsProperties, surveyPayloadSchema, surveySchemaVersion, type Profile} from '@statsgym/contracts';
 
 const base = (profil: Profile, extra: Record<string, unknown> = {}) => ({
+  survey_schema_version: surveySchemaVersion,
   submission_id: crypto.randomUUID(),
   profil,
   club_name: '',
@@ -66,5 +67,27 @@ describe('Contrat du questionnaire — étape Attentes', () => {
     expect(surveyPayloadSchema.safeParse(base('gymnaste', {access_model: 'current_ok', price_range: '3-4', price_period: 'monthly'})).success).toBe(false);
     expect(surveyPayloadSchema.safeParse(base('entraineur', {access_model: 'club_funded', price_range: '3-4', price_period: 'monthly'})).success).toBe(false);
     expect(surveyPayloadSchema.safeParse(base('club', {access_model: 'no_use'})).success).toBe(true);
+  });
+
+  it('produit des propriétés PostHog lisibles sans données personnelles', () => {
+    for (const [profil, model] of [['gymnaste', 'video'], ['parent', 'training'], ['entraineur', 'premium_options'], ['club', 'club_analytics']] as const) {
+      const scale = priceScaleFor(model);
+      const parsed = surveyPayloadSchema.parse(base(profil, {
+        access_model: model,
+        club_name: 'Club Démo',
+        idea: 'Texte privé',
+        waitlist_opt_in: true,
+        ...(scale ? {price_range: scale.ranges[0][0], price_period: scale.period} : {}),
+      }));
+      const properties = surveyAnalyticsProperties(parsed);
+      expect(properties.survey_schema_version).toBe(2);
+      expect(properties.profile_label).toBeTruthy();
+      expect(properties.access_model_label).toBeTruthy();
+      expect(properties.feature_historique_competitions_label).toBe('4');
+      expect(properties.club_name).toBe('Club Démo');
+      for (const forbidden of ['submission_id', 'first_name', 'last_name', 'email', 'idea', 'waitlist_opt_in']) {
+        expect(properties).not.toHaveProperty(forbidden);
+      }
+    }
   });
 });

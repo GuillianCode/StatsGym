@@ -48,4 +48,11 @@ describe('Parité entre la page publiée et le contrat', () => {
     // Un club ne répond plus à la question de fin d'étape 2.
     expect(publiees.statsLabels.club).toBeUndefined();
   });
+
+  it('publie le contrat analytique v2 sans soumission réussie côté client', () => {
+    expect(html).toContain('survey_schema_version:2');
+    expect(html).toContain("'x-posthog-distinct-id'");
+    expect(html).toContain("'x-posthog-session-id'");
+    expect(html).not.toContain("posthog.capture('survey_response_submitted'");
+  });
 });
