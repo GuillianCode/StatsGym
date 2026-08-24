@@ -5,7 +5,7 @@ visuellement la version `new-sondage` sans dépendre de son générateur HTML.
 
 ## Structure
 
-- `published-demo/` : démo HTML stable publiée sur GitHub Pages.
+- `published-demo/` : copie adaptée de `origin/main:new-sondage` publiée sur GitHub Pages.
 - `demo/` : chantier React + TypeScript indépendant, conservé pour la suite.
 - `demo/src/data/athletes.snapshot.json` : snapshot autonome de trois profils
   et de leurs trois partenaires de comparaison.
@@ -39,7 +39,8 @@ npm run test:e2e
 
 GitHub Actions publie directement `published-demo/` sur GitHub Pages. Au
 déploiement, il y injecte dans `runtime-config.js` l’URL publique de l’Edge
-Function Supabase ; aucune clé Supabase n’est embarquée dans le navigateur.
+Function Supabase et la configuration publique PostHog ; aucune clé Supabase
+sensible n’est embarquée dans le navigateur.
 Le chantier React reste vérifié par le workflow, mais n’est pas publié.
 
 Le workflow Supabase est volontairement manuel. Il applique les migrations et

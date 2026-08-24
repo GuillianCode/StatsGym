@@ -45,11 +45,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Configurer l'endpoint du questionnaire
+      - name: Configurer les services publics de la démo
         env:
           SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY }}
+          POSTHOG_HOST: https://eu.i.posthog.com
         run: |
-          node -e "const fs=require('fs'); const url=process.env.SUPABASE_URL; if (!url) throw new Error('La variable VITE_SUPABASE_URL est requise pour publier le questionnaire.'); const endpoint=url.replace(/\\/$/, '') + '/functions/v1/submit-survey'; fs.writeFileSync('published-demo/runtime-config.js', 'window.STATSGYM_CONFIG = Object.freeze({surveyEndpoint: ' + JSON.stringify(endpoint) + '});\\n');"
+          node -e "const fs=require('fs'); const url=process.env.SUPABASE_URL; if (!url) throw new Error('La variable VITE_SUPABASE_URL est requise pour publier le questionnaire.'); const config={surveyEndpoint:url.replace(/\\/$/, '') + '/functions/v1/submit-survey',posthogKey:process.env.POSTHOG_KEY || '',posthogHost:process.env.POSTHOG_HOST}; fs.writeFileSync('published-demo/runtime-config.js', 'window.STATSGYM_CONFIG = Object.freeze(' + JSON.stringify(config) + ');\\n');"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: published-demo

@@ -1,8 +1,10 @@
 # Démo HTML publiée
 
-Cette copie statique est la démo stable issue de `suivi-gymnaste-web/new-sondage`.
-GitHub Pages publie ce dossier directement ; le chantier React dans `demo/` reste
-indépendant et n'est pas utilisé par le site public.
+Cette copie provient de `new-sondage/` sur `origin/main` du dépôt
+`rappmaxime-web/suivi-gymnaste-web`, au commit source
+`4b56834a0917b42bb5e45daaf1d3843c6bf041f6`.
 
-`runtime-config.js` est remplacé par GitHub Actions avec l'URL publique de
-l'Edge Function Supabase. Il ne doit contenir aucune clé ni secret.
+Les seules adaptations locales concernent l’hébergement GitHub Pages : chemins
+des médias, configuration publique PostHog et envoi du questionnaire vers
+l’Edge Function Supabase. `runtime-config.js` est remplacé au déploiement et ne
+doit contenir aucune clé secrète.
