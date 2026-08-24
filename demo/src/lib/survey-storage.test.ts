@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import submitSurveySource from '../../../supabase/functions/submit-survey/index.ts?raw';
 import submissionIndexMigration from '../../../supabase/migrations/202608240002_fix_survey_submission_unique.sql?raw';
-import submissionPermissionMigration from '../../../supabase/migrations/202608240003_grant_survey_upsert_select.sql?raw';
+import submissionPermissionMigration from '../../../supabase/migrations/202608240006_fix_survey_upsert_permissions.sql?raw';
 import rateLimitMigration from '../../../supabase/migrations/202608240004_raise_survey_rate_limit.sql?raw';
 import schemaVersionMigration from '../../../supabase/migrations/202608240005_survey_schema_version.sql?raw';
 
@@ -13,8 +13,9 @@ describe('survey storage contract', () => {
     );
     expect(submissionIndexMigration).not.toMatch(/where\s+submission_id\s+is\s+not\s+null/i);
     expect(submissionPermissionMigration).toMatch(
-      /grant select \(submission_id\)\s+on table public\.survey_responses\s+to service_role;/i,
+      /grant select\s+on table public\.survey_responses\s+to service_role;/i,
     );
+    expect(submissionPermissionMigration).not.toMatch(/grant select\s*\(/i);
   });
 
   it('logs storage failures without logging the submitted payload', () => {
